@@ -15,7 +15,9 @@
 
 ### 通过 Plugin Manager 安装
 
-1. 下载最新版本：[pymol-ai-assistant.zip](https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest)
+1. 下载最新版本的源码压缩包：
+   - 访问 [Releases 页面](https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest)
+   - 下载 **Source code (zip)**（不是 Assets 下的文件）
 2. 打开 PyMOL → Plugin → Plugin Manager
 3. 点击 "Install New Plugin"
 4. 选择下载的 zip 文件
