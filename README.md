@@ -56,11 +56,6 @@
 - 使用邀请链接注册可获得 16 元代金券：https://cloud.siliconflow.cn/i/Su2ao83G
 - 也可以直接访问 Kimi 官网购买包月计划
 
-#### OpenAI 配置
-
-- **API URL**: `https://api.openai.com/v1`
-- **模型**: `gpt-4o`
-
 4. 配置完成后，在输入框中输入指令，按 Enter 发送
 
 ## 界面说明
