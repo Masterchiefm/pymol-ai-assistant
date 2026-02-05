@@ -142,9 +142,9 @@
 
 - **API URL**: `https://api.siliconflow.cn/v1`
 - **推荐模型**:
-  - `Pro/moonshotai/Kimi-K2.5` （综合最佳，推荐优先使用）
-  - `Pro/zai-org/GLM-4.7`
-  - `deepseek-ai/DeepSeek-V3.2` （需充值使用）
+  - `Pro/moonshotai/Kimi-K2.5` （综合最佳，**需充值使用**）
+  - `Pro/zai-org/GLM-4.7` （**需充值使用**）
+  - `deepseek-ai/DeepSeek-V3.2` （免费模型）
 
 **注册指南**：
 - 使用邀请链接注册可获得 16 元代金券：https://cloud.siliconflow.cn/i/Su2ao83G
