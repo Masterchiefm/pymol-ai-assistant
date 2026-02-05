@@ -2,6 +2,15 @@
 
 通过 AI 工具技能控制 PyMOL 分子可视化软件。
 
+## 代码仓库
+
+本项目同时在 GitHub 和 Gitee 同步维护：
+
+- **GitHub**: https://github.com/Masterchiefm/pymol-ai-assistant
+- **Gitee**: https://gitee.com/MasterChiefm/pymol-ai-assistant
+
+**国内用户推荐使用 Gitee 访问，下载速度更快。**
+
 ## 功能特性
 
 - 🤖 **AI 对话** - 使用自然语言控制 PyMOL
@@ -16,7 +25,8 @@
 ### 通过 Plugin Manager 安装
 
 1. 下载最新版本的源码压缩包：
-   - 访问 [Releases 页面](https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest)
+   - 访问 [Releases 页面](https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest) (GitHub)
+   - 或访问 [Releases 页面](https://gitee.com/MasterChiefm/pymol-ai-assistant/releases) (Gitee)
    - 下载 **Source code (zip)**（不是 Assets 下的文件）
 2. 打开 PyMOL → Plugin → Plugin Manager
 3. 点击 "Install New Plugin"
