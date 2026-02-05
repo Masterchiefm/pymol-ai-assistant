@@ -1047,6 +1047,8 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
 当用户询问关于当前选择的信息（如"选中的是什么氨基酸"），使用 pymol_get_selection_details 获取详细信息。
 当用户请求涉及 PyMOL 操作时，请使用相应工具。使用工具后，向用户解释你做了什么。
+
+重要：解释完操作后，不要给用户提建议或主动询问下一步，用户自己知道要做什么。
 """
     
     def _on_stream_content(self, content: str, is_thinking: bool = False):
