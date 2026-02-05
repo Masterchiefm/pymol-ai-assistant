@@ -822,6 +822,14 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
         main_layout.addWidget(main_tabs)
         
+        # 菜单栏
+        menubar = self.menuBar()
+        help_menu = menubar.addMenu("帮助")
+        
+        about_action = QtWidgets.QAction("关于", self)
+        about_action.triggered.connect(self.show_about_dialog)
+        help_menu.addAction(about_action)
+        
         # 状态栏
         self.status_bar = QtWidgets.QStatusBar()
         self.setStatusBar(self.status_bar)
@@ -1346,6 +1354,11 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.log_manager.error(f"AI 流式响应错误: {error}", LogType.ERROR)
         self.scroll_to_bottom()
 
+    def show_about_dialog(self):
+        """显示关于对话框"""
+        dialog = AboutDialog(self)
+        dialog.exec_()
+
 
 # 全局窗口实例
 _chat_window: Optional[AIChatWindow] = None
@@ -1379,3 +1392,195 @@ def show_chat_window():
         _chat_window = AIChatWindow()
     _chat_window.show()
     _chat_window.raise_()
+
+
+class AboutDialog(QtWidgets.QDialog):
+    """关于对话框"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("关于 PyMOL AI Assistant")
+        self.setFixedSize(500, 600)
+        self.setup_ui()
+    
+    def setup_ui(self):
+        """设置界面"""
+        # 深色主题样式
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e1e;
+            }
+            QWidget {
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+            }
+            QLabel {
+                color: #d4d4d4;
+                background-color: transparent;
+            }
+            QPushButton {
+                background-color: #0e639c;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 10px 24px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1177bb;
+            }
+        """)
+        
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setSpacing(20)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        
+        # 标题
+        title_label = QtWidgets.QLabel("🤖 PyMOL AI Assistant")
+        title_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #4ec9b0;")
+        title_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title_label)
+        
+        # 版本号
+        from . import __version__
+        version_label = QtWidgets.QLabel(f"Version {__version__}")
+        version_label.setStyleSheet("font-size: 14px; color: #808080;")
+        version_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(version_label)
+        
+        layout.addSpacing(20)
+        
+        # 插件介绍
+        intro_text = QtWidgets.QLabel(
+            "PyMOL AI Assistant 是一款基于 AI 工具技能（Function Calling）的 PyMOL 插件，\n"
+            "让您可以使用自然语言控制 PyMOL 分子可视化软件。\n\n"
+            "主要功能：\n"
+            "• 🤖 AI 对话 - 使用自然语言控制 PyMOL\n"
+            "• 🌊 流式显示 - 实时显示 AI 思考和输出\n"
+            "• 🔧 工具调用 - AI 可直接操作 PyMOL（加载结构、设置样式、保存图像等）\n"
+            "• ⚙️ 配置管理 - 支持多 API 配置（SiliconFlow、OpenAI 等）\n"
+            "• 📋 日志系统 - 记录所有对话和工具调用"
+        )
+        intro_text.setStyleSheet("font-size: 12px; color: #d4d4d4; line-height: 1.6;")
+        intro_text.setAlignment(Qt.AlignLeft)
+        intro_text.setWordWrap(True)
+        layout.addWidget(intro_text)
+        
+        layout.addSpacing(20)
+        
+        # 作者信息
+        info_widget = QtWidgets.QWidget()
+        info_layout = QtWidgets.QFormLayout(info_widget)
+        info_layout.setSpacing(8)
+        info_layout.setLabelAlignment(Qt.AlignRight)
+        
+        author_label = QtWidgets.QLabel("Mo Qiqin")
+        author_label.setStyleSheet("color: #d4d4d4;")
+        info_layout.addRow("作者:", author_label)
+        
+        email_label = QtWidgets.QLabel("moqiqin@live.com")
+        email_label.setStyleSheet("color: #569cd6;")
+        info_layout.addRow("邮箱:", email_label)
+        
+        # GitHub 链接
+        github_link = QtWidgets.QLabel(
+            "<a href='https://github.com/Masterchiefm/pymol-ai-assistant' "
+            "style='color: #569cd6; text-decoration: none;'>"
+            "GitHub 仓库</a>"
+        )
+        github_link.setOpenExternalLinks(True)
+        github_link.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        info_layout.addRow("项目主页:", github_link)
+        
+        layout.addWidget(info_widget)
+        layout.addStretch()
+        
+        # 捐赠按钮
+        donate_btn = QtWidgets.QPushButton("☕ 请我喝咖啡")
+        donate_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #d4a574;
+                color: #1e1e1e;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 30px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #e4b584;
+            }
+        """)
+        donate_btn.clicked.connect(self.show_donate)
+        layout.addWidget(donate_btn, alignment=Qt.AlignCenter)
+        
+        layout.addSpacing(10)
+        
+        # 关闭按钮
+        close_btn = QtWidgets.QPushButton("关闭")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn, alignment=Qt.AlignCenter)
+    
+    def show_donate(self):
+        """显示捐赠二维码"""
+        donate_dialog = QtWidgets.QDialog(self)
+        donate_dialog.setWindowTitle("☕ 请我喝咖啡")
+        donate_dialog.setFixedSize(350, 400)
+        donate_dialog.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e1e;
+            }
+            QLabel {
+                color: #d4d4d4;
+                background-color: transparent;
+            }
+        """)
+        
+        layout = QtWidgets.QVBoxLayout(donate_dialog)
+        layout.setAlignment(Qt.AlignCenter)
+        
+        # 提示文字
+        hint_label = QtWidgets.QLabel("如果本插件对您有帮助，欢迎打赏支持！")
+        hint_label.setStyleSheet("color: #d4d4d4; font-size: 12px;")
+        hint_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(hint_label)
+        
+        layout.addSpacing(10)
+        
+        # 加载二维码图片
+        import os
+        qr_path = os.path.join(os.path.dirname(__file__), "fig", "donate.png")
+        
+        qr_label = QtWidgets.QLabel()
+        if os.path.exists(qr_path):
+            pixmap = QtGui.QPixmap(qr_path)
+            # 缩放图片到合适大小
+            scaled_pixmap = pixmap.scaled(280, 280, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            qr_label.setPixmap(scaled_pixmap)
+        else:
+            qr_label.setText("二维码图片未找到\n请放置于 fig/donate.png")
+            qr_label.setStyleSheet("color: #f44747; font-size: 12px;")
+        qr_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(qr_label)
+        
+        layout.addSpacing(10)
+        
+        # 关闭按钮
+        close_btn = QtWidgets.QPushButton("关闭")
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3c3c3c;
+                color: #d4d4d4;
+                border: 1px solid #5c5c5c;
+                border-radius: 4px;
+                padding: 8px 20px;
+            }
+            QPushButton:hover {
+                background-color: #4c4c4c;
+            }
+        """)
+        close_btn.clicked.connect(donate_dialog.accept)
+        layout.addWidget(close_btn, alignment=Qt.AlignCenter)
+        
+        donate_dialog.exec_()
