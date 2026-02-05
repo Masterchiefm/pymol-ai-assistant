@@ -9,10 +9,10 @@ PyMOL AI Assistant Plugin
 - AI 工具控制 PyMOL
 
 Author: AI Assistant
-Version: 1.0.0
+Version: 1.2.0
 """
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 
 import sys
 import os
