@@ -97,6 +97,7 @@
 
 ## 支持的 AI 工具
 
+### 结构加载与脚本执行
 | 工具名 | 功能 |
 |--------|------|
 | pymol_fetch | 从 PDB 下载结构 |
@@ -104,6 +105,24 @@
 | pymol_run_script | 执行 Python 脚本（.py/.pym） |
 | pymol_run_pml | 执行 PyMOL 脚本（.pml） |
 | pymol_do_command | 执行 PyMOL 命令 |
+
+### 信息查询
+| 工具名 | 功能 |
+|--------|------|
+| pymol_get_info | 获取基本信息（原子数、对象、链） |
+| pymol_get_selection_details | 获取选择集详细信息（残基列表、原子数） |
+| pymol_get_atom_info | 获取原子详细信息（坐标、B因子、元素等） |
+| pymol_get_residue_info | 获取残基详细信息（残基名、编号、二级结构） |
+| pymol_get_chain_info | 获取链详细信息（残基范围、原子数） |
+| pymol_get_object_info | 获取对象详细信息（状态数、残基数） |
+| pymol_get_distance | 计算两个选择之间的距离 |
+| pymol_get_angle | 计算三个原子之间的角度 |
+| pymol_get_dihedral | 计算四个原子之间的二面角 |
+| pymol_find_contacts | 查找原子接触（距离小于阈值） |
+
+### 显示与操作
+| 工具名 | 功能 |
+|--------|------|
 | pymol_show | 显示表示形式 |
 | pymol_hide | 隐藏表示形式 |
 | pymol_color | 设置颜色 |
@@ -112,13 +131,16 @@
 | pymol_rotate | 旋转视图 |
 | pymol_select | 创建选择集 |
 | pymol_label | 添加标签 |
-| pymol_ray | 光线追踪渲染 |
-| pymol_png | 保存图像 |
-| pymol_get_info | 获取分子信息 |
 | pymol_reset | 重置视图 |
 | pymol_center | 居中视图 |
 | pymol_remove | 删除对象或选择集 |
 | pymol_set | 设置 PyMOL 参数 |
+
+### 图像导出
+| 工具名 | 功能 |
+|--------|------|
+| pymol_ray | 光线追踪渲染 |
+| pymol_png | 保存图像 |
 
 ## 默认配置
 
@@ -188,6 +210,19 @@ pip install openai>=1.0.0 aiohttp>=3.8.0
 3. 流式响应需要稳定的网络连接
 
 ## 版本历史
+
+### v1.2.0
+- 新增 `pymol_get_selection_details`: 获取选择集详细残基信息
+- 新增 `pymol_get_atom_info`: 获取原子详细信息（坐标、B因子、元素等）
+- 新增 `pymol_get_residue_info`: 获取残基详细信息
+- 新增 `pymol_get_chain_info`: 获取链详细信息（残基范围、原子数）
+- 新增 `pymol_get_object_info`: 获取对象详细信息
+- 新增 `pymol_get_distance`: 计算距离
+- 新增 `pymol_get_angle`: 计算角度
+- 新增 `pymol_get_dihedral`: 计算二面角
+- 新增 `pymol_find_contacts`: 查找原子接触
+- 改进所有信息获取工具返回更详细的数据
+- 改进 `pymol_color`: 添加 by_b（按 B因子）颜色方案
 
 ### v1.1.0
 - 新增脚本执行支持（Python .py/.pym 和 PyMOL .pml）

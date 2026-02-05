@@ -105,7 +105,7 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "pymol_do_command",
-                "description": "执行一个或多个 PyMOL 命令。多个命令可以用换行符分隔。适用于快速执行简单命令。",
+                "description": "执行一个或多个 PyMOL 命令。多个命令可以用换行符或分号分隔。适用于快速执行简单命令。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -115,6 +115,223 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
                         }
                     },
                     "required": ["commands"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_get_info",
+                "description": "获取当前加载分子的基本信息，包括原子数、对象列表、链列表。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selection": {
+                            "type": "string",
+                            "description": "选择表达式（可选，默认 all）",
+                            "default": "all"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_get_selection_details",
+                "description": "获取选择集的详细信息，包括每个残基的名称、编号、链、原子数等。适用于回答'当前选中的是什么氨基酸'之类的问题。默认使用 'sele'（PyMOL 的当前选择集）。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selection": {
+                            "type": "string",
+                            "description": "选择表达式（可选，默认 'sele' 即当前选择集）",
+                            "default": "sele"
+                        },
+                        "include_atoms": {
+                            "type": "boolean",
+                            "description": "是否包含每个原子的详细信息（原子名、元素、坐标等）",
+                            "default": false
+                        }
+                    },
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_get_atom_info",
+                "description": "获取单个或多个原子的详细信息，包括原子名、元素、残基、链、B因子、坐标等。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selection": {
+                            "type": "string",
+                            "description": "选择表达式，如 'sele', 'chain A and resi 50', '/1abc//A/50/CA'",
+                            "default": "sele"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_get_residue_info",
+                "description": "获取残基的详细信息，包括残基名、残基号、链、二级结构、原子数等。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selection": {
+                            "type": "string",
+                            "description": "选择表达式，如 'sele', 'chain A and resi 50', '/1abc//A/50'",
+                            "default": "sele"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_get_chain_info",
+                "description": "获取链的详细信息，包括链标识、残基范围、原子数等。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selection": {
+                            "type": "string",
+                            "description": "选择表达式，如 'chain A', 'all', 'sele'",
+                            "default": "all"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_get_object_info",
+                "description": "获取对象的详细信息，包括对象名、状态数、原子数、残基数、链等。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "object_name": {
+                            "type": "string",
+                            "description": "对象名称（可选，留空则返回所有对象信息）"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_get_distance",
+                "description": "计算两个选择之间的距离（埃）。返回第一个原子对之间的距离。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selection1": {
+                            "type": "string",
+                            "description": "第一个选择，如 '/1abc//A/50/CA' 或 'chain A and resi 50 and name CA'"
+                        },
+                        "selection2": {
+                            "type": "string",
+                            "description": "第二个选择，如 '/1abc//A/100/CA' 或 'chain A and resi 100 and name CA'"
+                        }
+                    },
+                    "required": ["selection1", "selection2"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_get_angle",
+                "description": "计算三个原子之间的角度（度）。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selection1": {
+                            "type": "string",
+                            "description": "第一个原子选择"
+                        },
+                        "selection2": {
+                            "type": "string",
+                            "description": "第二个原子选择（角顶点）"
+                        },
+                        "selection3": {
+                            "type": "string",
+                            "description": "第三个原子选择"
+                        }
+                    },
+                    "required": ["selection1", "selection2", "selection3"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_get_dihedral",
+                "description": "计算四个原子之间的二面角（度）。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selection1": {
+                            "type": "string",
+                            "description": "第一个原子选择"
+                        },
+                        "selection2": {
+                            "type": "string",
+                            "description": "第二个原子选择"
+                        },
+                        "selection3": {
+                            "type": "string",
+                            "description": "第三个原子选择"
+                        },
+                        "selection4": {
+                            "type": "string",
+                            "description": "第四个原子选择"
+                        }
+                    },
+                    "required": ["selection1", "selection2", "selection3", "selection4"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_find_contacts",
+                "description": "查找两个选择之间的原子接触（距离小于指定阈值）。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selection1": {
+                            "type": "string",
+                            "description": "第一个选择"
+                        },
+                        "selection2": {
+                            "type": "string",
+                            "description": "第二个选择"
+                        },
+                        "cutoff": {
+                            "type": "number",
+                            "description": "距离阈值（埃），默认 4.0",
+                            "default": 4.0
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "创建的接触选择集名称（可选）"
+                        }
+                    },
+                    "required": ["selection1", "selection2"]
                 }
             }
         },
@@ -174,7 +391,7 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
                     "properties": {
                         "color": {
                             "type": "string",
-                            "description": "颜色名称: red, green, blue, yellow, cyan, magenta, white, black, gray, orange, purple, pink, wheat, paleyellow, lightblue, salmon, lime, slate, hotpink, yelloworange, violet, grey, brown, or special: rainbow, by_element, by_chain, by_ss, by_resi"
+                            "description": "颜色名称: red, green, blue, yellow, cyan, magenta, white, black, gray, orange, purple, pink, wheat, paleyellow, lightblue, salmon, lime, slate, hotpink, yelloworange, violet, grey, brown, or special: rainbow, by_element, by_chain, by_ss, by_resi, by_b"
                         },
                         "selection": {
                             "type": "string",
@@ -351,24 +568,6 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "pymol_get_info",
-                "description": "获取当前加载分子的信息。",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "selection": {
-                            "type": "string",
-                            "description": "选择表达式（可选，默认 all）",
-                            "default": "all"
-                        }
-                    },
-                    "required": []
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
                 "name": "pymol_reset",
                 "description": "重置视图到默认状态。",
                 "parameters": {
@@ -518,7 +717,6 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
                     "message": f"脚本文件不存在: {filename}"
                 }
 
-            # 使用 @ 命令执行 .pml 文件
             cmd.do(f"@{filename}")
             return {
                 "success": True,
@@ -532,6 +730,372 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
                 "success": True,
                 "message": f"已执行命令: {commands[:100]}{'...' if len(commands) > 100 else ''}"
             }
+
+        elif tool_name == "pymol_get_info":
+            selection = arguments.get("selection", "all")
+
+            atom_count = cmd.count_atoms(selection)
+            object_list = cmd.get_object_list(selection) or []
+
+            try:
+                chains = cmd.get_chains(selection) or []
+            except:
+                chains = []
+
+            info = {
+                "atom_count": atom_count,
+                "object_list": object_list,
+                "chains": chains,
+                "selection": selection
+            }
+
+            return {
+                "success": True,
+                "message": f"分子信息: {atom_count} 个原子, {len(object_list)} 个对象, 链: {chains}",
+                "data": info
+            }
+
+        elif tool_name == "pymol_get_selection_details":
+            selection = arguments.get("selection", "sele")
+            include_atoms = arguments.get("include_atoms", False)
+
+            atom_count = cmd.count_atoms(selection)
+            if atom_count == 0:
+                return {
+                    "success": True,
+                    "message": f"选择集 '{selection}' 为空，没有选中任何原子",
+                    "data": {"selection": selection, "atom_count": 0, "residues": []}
+                }
+
+            # 收集残基信息
+            residues = {}
+            atoms = []
+
+            def collect_residue_info(model, chain, resi, resn, ss, atom_name, atom_elem, atom_b, atom_id):
+                key = (model, chain, resi, resn)
+                if key not in residues:
+                    residues[key] = {
+                        "model": model,
+                        "chain": chain,
+                        "residue_number": resi,
+                        "residue_name": resn,
+                        "secondary_structure": ss,
+                        "atom_count": 0,
+                        "atoms": []
+                    }
+                residues[key]["atom_count"] += 1
+                residues[key]["atoms"].append({
+                    "name": atom_name,
+                    "element": atom_elem,
+                    "b_factor": atom_b,
+                    "id": atom_id
+                })
+
+                if include_atoms:
+                    atoms.append({
+                        "model": model,
+                        "chain": chain,
+                        "residue_number": resi,
+                        "residue_name": resn,
+                        "atom_name": atom_name,
+                        "element": atom_elem,
+                        "b_factor": atom_b,
+                        "id": atom_id
+                    })
+
+            # 获取原子详细信息
+            cmd.iterate(selection,
+                        "collect_residue_info(model, chain, resi, resn, ss, name, elem, b, ID)",
+                        space={"collect_residue_info": collect_residue_info})
+
+            # 获取坐标信息（如果需要）
+            if include_atoms:
+                for i, atom in enumerate(atoms):
+                    coords = cmd.get_coords(f"/{atom['model']}//{atom['chain']}/{atom['residue_number']}/{atom['atom_name']}")
+                    if coords is not None and len(coords) > 0:
+                        atom["coordinates"] = coords[0].tolist()
+
+            # 转换为列表
+            residue_list = sorted(residues.values(),
+                                key=lambda x: (x["model"], x["chain"], int(x["residue_number"]) if x["residue_number"].isdigit() else 999999))
+
+            result = {
+                "selection": selection,
+                "atom_count": atom_count,
+                "residue_count": len(residue_list),
+                "residues": residue_list
+            }
+
+            if include_atoms:
+                result["atoms"] = atoms
+
+            message = f"选择集 '{selection}' 包含 {atom_count} 个原子，共 {len(residue_list)} 个残基：\n"
+            for res in residue_list:
+                ss_map = {"H": "螺旋", "S": "折叠", "L": "环", "": "无"}
+                ss_text = ss_map.get(res["secondary_structure"], res["secondary_structure"])
+                message += f"  - {res['residue_name']} {res['residue_number']} (链 {res['chain']}, {ss_text}, {res['atom_count']} 原子)\n"
+
+            return {
+                "success": True,
+                "message": message,
+                "data": result
+            }
+
+        elif tool_name == "pymol_get_atom_info":
+            selection = arguments.get("selection", "sele")
+
+            atom_count = cmd.count_atoms(selection)
+            if atom_count == 0:
+                return {
+                    "success": True,
+                    "message": f"选择 '{selection}' 没有选中任何原子",
+                    "data": {"selection": selection, "atoms": []}
+                }
+
+            atoms = []
+
+            def collect_atom_info(model, chain, resi, resn, ss, name, elem, b, q, ID, type):
+                coords = cmd.get_coords(f"/{model}//{chain}/{resi}/{name}")
+                coord_list = coords[0].tolist() if coords is not None and len(coords) > 0 else None
+
+                atoms.append({
+                    "model": model,
+                    "chain": chain,
+                    "residue_number": resi,
+                    "residue_name": resn,
+                    "secondary_structure": ss,
+                    "atom_name": name,
+                    "element": elem,
+                    "b_factor": b,
+                    "occupancy": q,
+                    "id": ID,
+                    "type": type,
+                    "coordinates": coord_list
+                })
+
+            cmd.iterate(selection,
+                        "collect_atom_info(model, chain, resi, resn, ss, name, elem, b, q, ID, type)",
+                        space={"collect_atom_info": collect_atom_info})
+
+            return {
+                "success": True,
+                "message": f"找到 {atom_count} 个原子",
+                "data": {"selection": selection, "atom_count": atom_count, "atoms": atoms}
+            }
+
+        elif tool_name == "pymol_get_residue_info":
+            selection = arguments.get("selection", "sele")
+
+            residues = {}
+
+            def collect_res_info(model, chain, resi, resn, ss):
+                key = (model, chain, resi, resn)
+                if key not in residues:
+                    residues[key] = {
+                        "model": model,
+                        "chain": chain,
+                        "residue_number": resi,
+                        "residue_name": resn,
+                        "secondary_structure": ss
+                    }
+
+            cmd.iterate_state(1, selection,
+                            "collect_res_info(model, chain, resi, resn, ss)",
+                            space={"collect_res_info": collect_res_info})
+
+            # 计算每个残基的原子数
+            for key in residues:
+                model, chain, resi, resn = key
+                atom_count = cmd.count_atoms(f"/{model}//{chain}/{resi}/")
+                residues[key]["atom_count"] = atom_count
+
+            residue_list = sorted(residues.values(),
+                                key=lambda x: (x["model"], x["chain"], int(x["residue_number"]) if x["residue_number"].isdigit() else 999999))
+
+            return {
+                "success": True,
+                "message": f"找到 {len(residue_list)} 个残基",
+                "data": {"selection": selection, "residue_count": len(residue_list), "residues": residue_list}
+            }
+
+        elif tool_name == "pymol_get_chain_info":
+            selection = arguments.get("selection", "all")
+
+            try:
+                chains = cmd.get_chains(selection) or []
+            except:
+                chains = []
+
+            chain_info = []
+
+            for chain in chains:
+                chain_sel = f"{selection} and chain {chain}"
+                atom_count = cmd.count_atoms(chain_sel)
+
+                # 获取残基范围
+                residues = {}
+                def collect_res_info(resi, resn):
+                    residues[(resi, resn)] = True
+
+                try:
+                    cmd.iterate(chain_sel, "collect_res_info(resi, resn)",
+                               space={"collect_res_info": collect_res_info})
+
+                    resi_list = sorted([k[0] for k in residues.keys()],
+                                       key=lambda x: int(x) if x.isdigit() else 999999)
+
+                    if resi_list:
+                        resi_min = resi_list[0]
+                        resi_max = resi_list[-1]
+                    else:
+                        resi_min = resi_max = ""
+                except:
+                    resi_min = resi_max = ""
+
+                chain_info.append({
+                    "chain": chain,
+                    "atom_count": atom_count,
+                    "residue_range": f"{resi_min}-{resi_max}" if resi_min and resi_max else "",
+                    "residue_count": len(residues)
+                })
+
+            return {
+                "success": True,
+                "message": f"找到 {len(chain_info)} 条链",
+                "data": {"chain_count": len(chain_info), "chains": chain_info}
+            }
+
+        elif tool_name == "pymol_get_object_info":
+            object_name = arguments.get("object_name", "")
+
+            if object_name:
+                objects = [object_name]
+            else:
+                objects = cmd.get_object_list("all") or []
+
+            object_info = []
+
+            for obj in objects:
+                atom_count = cmd.count_atoms(obj)
+                state_count = cmd.get_object_state(obj)
+
+                # 获取链信息
+                try:
+                    chains = cmd.get_chains(obj) or []
+                except:
+                    chains = []
+
+                # 获取残基数
+                residues = set()
+                def collect_res(resi, resn, chain):
+                    residues.add((resi, resn, chain))
+
+                try:
+                    cmd.iterate(obj, "collect_res(resi, resn, chain)",
+                               space={"collect_res": collect_res})
+                except:
+                    pass
+
+                object_info.append({
+                    "name": obj,
+                    "atom_count": atom_count,
+                    "state_count": state_count,
+                    "residue_count": len(residues),
+                    "chains": chains
+                })
+
+            return {
+                "success": True,
+                "message": f"对象信息: {len(object_info)} 个对象",
+                "data": {"object_count": len(object_info), "objects": object_info}
+            }
+
+        elif tool_name == "pymol_get_distance":
+            selection1 = arguments.get("selection1", "")
+            selection2 = arguments.get("selection2", "")
+
+            try:
+                distance = cmd.get_distance(selection1, selection2)
+                return {
+                    "success": True,
+                    "message": f"距离: {distance:.3f} Å",
+                    "data": {"selection1": selection1, "selection2": selection2, "distance": distance}
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "message": f"计算距离失败: {str(e)}"
+                }
+
+        elif tool_name == "pymol_get_angle":
+            selection1 = arguments.get("selection1", "")
+            selection2 = arguments.get("selection2", "")
+            selection3 = arguments.get("selection3", "")
+
+            try:
+                angle = cmd.get_angle(selection1, selection2, selection3)
+                return {
+                    "success": True,
+                    "message": f"角度: {angle:.2f}°",
+                    "data": {"selection1": selection1, "selection2": selection2, "selection3": selection3, "angle": angle}
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "message": f"计算角度失败: {str(e)}"
+                }
+
+        elif tool_name == "pymol_get_dihedral":
+            selection1 = arguments.get("selection1", "")
+            selection2 = arguments.get("selection2", "")
+            selection3 = arguments.get("selection3", "")
+            selection4 = arguments.get("selection4", "")
+
+            try:
+                dihedral = cmd.get_dihedral(selection1, selection2, selection3, selection4)
+                return {
+                    "success": True,
+                    "message": f"二面角: {dihedral:.2f}°",
+                    "data": {"selection1": selection1, "selection2": selection2, "selection3": selection3,
+                            "selection4": selection4, "dihedral": dihedral}
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "message": f"计算二面角失败: {str(e)}"
+                }
+
+        elif tool_name == "pymol_find_contacts":
+            selection1 = arguments.get("selection1", "")
+            selection2 = arguments.get("selection2", "")
+            cutoff = arguments.get("cutoff", 4.0)
+            name = arguments.get("name", "")
+
+            try:
+                result = cmd.find_pairs(f"({selection1}) and ({selection2})", cutoff)
+                contact_count = len(result)
+
+                if name:
+                    # 创建选择集
+                    selections = []
+                    for pair in result:
+                        for atom in pair:
+                            selections.append(f"ID {atom[6]}")
+                    if selections:
+                        sel_expr = " or ".join(selections)
+                        cmd.select(name, sel_expr)
+
+                return {
+                    "success": True,
+                    "message": f"找到 {contact_count} 对接触原子（距离 < {cutoff} Å）",
+                    "data": {"selection1": selection1, "selection2": selection2, "cutoff": cutoff,
+                            "contact_count": contact_count, "contacts": result}
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "message": f"查找接触失败: {str(e)}"
+                }
 
         elif tool_name == "pymol_show":
             representation = arguments.get("representation", "")
@@ -555,17 +1119,18 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
             color = arguments.get("color", "")
             selection = arguments.get("selection", "all")
 
-            # 特殊颜色方案
             if color == "rainbow":
                 cmd.spectrum(selection)
             elif color == "by_element":
                 cmd.color("atomic", selection)
             elif color == "by_chain":
-                cmd.util.cbc(selection)  # color by chain
+                cmd.util.cbc(selection)
             elif color == "by_ss":
                 cmd.color("ss", selection)
             elif color == "by_resi":
                 cmd.spectrum("count", selection=selection)
+            elif color == "by_b":
+                cmd.spectrum("b", selection=selection)
             else:
                 cmd.color(color, selection)
 
@@ -648,41 +1213,6 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
             return {
                 "success": True,
                 "message": f"图像已保存到: {filename}"
-            }
-
-        elif tool_name == "pymol_get_info":
-            selection = arguments.get("selection", "all")
-
-            # 获取信息
-            atom_count = cmd.count_atoms(selection)
-            object_list = cmd.get_object_list(selection) or []
-
-            # 尝试获取链信息
-            try:
-                chains = cmd.get_chains(selection) or []
-            except:
-                chains = []
-
-            # 尝试获取残基信息
-            try:
-                resn_list = []
-                for obj in object_list:
-                    cmd.iterate(f"{obj} and ({selection})", "resn_list.append((model, chain, resi, resn))",
-                                space={'resn_list': resn_list})
-            except:
-                resn_list = []
-
-            info = {
-                "atom_count": atom_count,
-                "object_list": object_list,
-                "chains": chains,
-                "selection": selection
-            }
-
-            return {
-                "success": True,
-                "message": f"分子信息: {atom_count} 个原子, {len(object_list)} 个对象, 链: {chains}",
-                "data": info
             }
 
         elif tool_name == "pymol_reset":
