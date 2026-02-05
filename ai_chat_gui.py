@@ -661,6 +661,26 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.send_btn.clicked.connect(self.send_message)
         input_layout.addWidget(self.send_btn)
 
+        # 停止按钮
+        self.stop_btn = QtWidgets.QPushButton("停止")
+        self.stop_btn.setMinimumHeight(60)
+        self.stop_btn.setVisible(False)  # 初始隐藏
+        self.stop_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
+        self.stop_btn.clicked.connect(self.stop_streaming)
+        input_layout.addWidget(self.stop_btn)
+
         chat_layout.addLayout(input_layout)
 
         main_tabs.addTab(chat_tab, "💬 AI 对话")
@@ -768,11 +788,13 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.current_message_widget = None
         self.send_btn.setEnabled(False)
         self.send_btn.setText("等待...")
+        self.send_btn.setVisible(False)  # 隐藏发送按钮
+        self.stop_btn.setVisible(True)  # 显示停止按钮
         self.status_bar.showMessage("AI 思考中...")
-        
+
         # 创建新的 AI 消息部件
         self.current_message_widget = self.add_message_widget("assistant")
-        
+
         # 在后台线程中运行 AI 请求
         self.ai_thread = threading.Thread(target=self._run_ai_stream)
         self.ai_thread.daemon = True
@@ -1126,7 +1148,19 @@ class AIChatWindow(QtWidgets.QMainWindow):
             self, "_finish_stream",
             QtCore.Qt.QueuedConnection
         )
-    
+
+    def stop_streaming(self):
+        """停止流式响应"""
+        if self.is_streaming:
+            self.log_manager.info("用户停止流式响应", LogType.SYSTEM)
+            self.is_streaming = False
+            # 重置 UI 状态
+            self.send_btn.setEnabled(True)
+            self.send_btn.setText("发送")
+            self.send_btn.setVisible(True)
+            self.stop_btn.setVisible(False)
+            self.status_bar.showMessage("已停止")
+
     @QtCore.Slot()
     def _finish_stream(self):
         """完成流式响应"""
@@ -1134,6 +1168,8 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.current_message_widget = None
         self.send_btn.setEnabled(True)
         self.send_btn.setText("发送")
+        self.send_btn.setVisible(True)  # 显示发送按钮
+        self.stop_btn.setVisible(False)  # 隐藏停止按钮
         self.status_bar.showMessage("就绪")
     
     def _on_stream_error(self, error: str):
@@ -1151,6 +1187,8 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.is_streaming = False
         self.send_btn.setEnabled(True)
         self.send_btn.setText("发送")
+        self.send_btn.setVisible(True)  # 显示发送按钮
+        self.stop_btn.setVisible(False)  # 隐藏停止按钮
         self.status_bar.showMessage(f"错误: {error}")
 
         if self.current_message_widget:
