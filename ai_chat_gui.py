@@ -926,7 +926,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
                 if not tool_calls_data:
                     # 没有工具调用，如果有内容则添加到历史并结束
                     if full_content:
-                        self.chat_history.append({"role": "assistant", "content": full_content})
+                        self.chat_history.append({"role": "assistant", "content": full_content, "reasoning_content": ""})
                         self.log_manager.chat_assistant(full_content)
                     break
 
@@ -1011,7 +1011,8 @@ class AIChatWindow(QtWidgets.QMainWindow):
                 if tool_calls_for_history:
                     assistant_msg = {
                         "role": "assistant",
-                        "tool_calls": tool_calls_for_history
+                        "tool_calls": tool_calls_for_history,
+                        "reasoning_content": ""  # SiliconFlow API 要求包含此字段
                     }
                     # 如果有文本内容，也要包含进去
                     if full_content:
