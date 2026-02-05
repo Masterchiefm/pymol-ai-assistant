@@ -715,17 +715,28 @@ class AIChatWindow(QtWidgets.QMainWindow):
                 background-color: #1e1e1e;
             }
             QScrollBar:vertical {
-                background-color: #2d2d2d;
-                width: 12px;
+                background-color: transparent;
+                width: 8px;
                 margin: 0px;
+                border: none;
             }
             QScrollBar::handle:vertical {
-                background-color: #4d4d4d;
-                min-height: 20px;
-                border-radius: 6px;
+                background-color: #5a5a5a;
+                min-height: 30px;
+                border-radius: 4px;
+                margin: 2px;
             }
             QScrollBar::handle:vertical:hover {
-                background-color: #5d5d5d;
+                background-color: #6e6e6e;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+                border: none;
+                background: transparent;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: transparent;
+                border: none;
             }
         """)
 
