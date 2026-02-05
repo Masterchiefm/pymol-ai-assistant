@@ -791,119 +791,158 @@ class AIChatWindow(QtWidgets.QMainWindow):
             self._on_stream_error(str(e))
     
     async def _stream_ai_response(self):
-        """流式 AI 响应"""
+        """流式 AI 响应（支持多轮工具调用）"""
         try:
             from openai import AsyncOpenAI
         except ImportError:
             self._on_stream_error("缺少 openai 包，请安装: pip install openai")
             return
-        
+
         config = self.current_config
         if not config:
             self._on_stream_error("未配置 API")
             return
-        
+
         try:
             client = AsyncOpenAI(
                 api_key=config.api_key,
                 base_url=config.api_url
             )
-            
-            # 准备消息
-            messages = self.chat_history.copy()
-            
-            # 添加系统提示
-            system_prompt = self._get_system_prompt()
-            messages.insert(0, {"role": "system", "content": system_prompt})
-            
+
             # 准备工具
             tools = get_tool_definitions()
-            
-            # 发送请求
-            response = await client.chat.completions.create(
-                model=config.model,
-                messages=messages,
-                tools=tools,
-                tool_choice="auto",
-                stream=True
-            )
-            
-            # 处理流式响应
-            full_content = ""
-            tool_calls_data = []
-            current_tool_call = None
-            
-            async for chunk in response:
-                delta = chunk.choices[0].delta
-                
-                # 处理内容
-                if delta.content:
-                    content = delta.content
-                    full_content += content
-                    self._on_stream_content(content, is_thinking=False)
-                
-                # 处理思考过程（如果模型支持）
-                if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
-                    self._on_stream_content(delta.reasoning_content, is_thinking=True)
-                
+
+            # 循环处理，直到 AI 不再调用工具
+            max_iterations = 10  # 防止无限循环
+            iteration = 0
+
+            while iteration < max_iterations:
+                iteration += 1
+
+                # 准备消息
+                messages = self.chat_history.copy()
+
+                # 添加系统提示
+                system_prompt = self._get_system_prompt()
+                messages.insert(0, {"role": "system", "content": system_prompt})
+
+                # 发送请求
+                response = await client.chat.completions.create(
+                    model=config.model,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice="auto",
+                    stream=True
+                )
+
+                # 处理流式响应
+                full_content = ""
+                tool_calls_data = []
+
+                async for chunk in response:
+                    delta = chunk.choices[0].delta
+
+                    # 处理内容
+                    if delta.content:
+                        content = delta.content
+                        full_content += content
+                        self._on_stream_content(content, is_thinking=False)
+
+                    # 处理思考过程（如果模型支持）
+                    if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                        self._on_stream_content(delta.reasoning_content, is_thinking=True)
+
+                    # 处理工具调用
+                    if delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            index = tc.index
+
+                            # 确保有足够的空间
+                            while len(tool_calls_data) <= index:
+                                tool_calls_data.append({"id": "", "name": "", "arguments": ""})
+
+                            if tc.id:
+                                tool_calls_data[index]["id"] = tc.id
+                            if tc.function:
+                                if tc.function.name:
+                                    tool_calls_data[index]["name"] = tc.function.name
+                                if tc.function.arguments:
+                                    tool_calls_data[index]["arguments"] += tc.function.arguments
+
+                                    # 尝试解析参数并显示
+                                    try:
+                                        args = json.loads(tool_calls_data[index]["arguments"])
+                                        self._on_tool_call(tool_calls_data[index]["name"], args)
+                                    except:
+                                        pass
+
                 # 处理工具调用
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        index = tc.index
-                        
-                        # 确保有足够的空间
-                        while len(tool_calls_data) <= index:
-                            tool_calls_data.append({"name": "", "arguments": ""})
-                        
-                        if tc.function:
-                            if tc.function.name:
-                                tool_calls_data[index]["name"] = tc.function.name
-                            if tc.function.arguments:
-                                tool_calls_data[index]["arguments"] += tc.function.arguments
-                                
-                                # 尝试解析参数并显示
-                                try:
-                                    args = json.loads(tool_calls_data[index]["arguments"])
-                                    self._on_tool_call(tool_calls_data[index]["name"], args)
-                                except:
-                                    pass
-            
-            # 处理工具调用
-            if tool_calls_data:
+                tool_calls_for_history = []
+
+                if not tool_calls_data:
+                    # 没有工具调用，如果有内容则添加到历史并结束
+                    if full_content:
+                        self.chat_history.append({"role": "assistant", "content": full_content})
+                        self.log_manager.chat_assistant(full_content)
+                    break
                 for tool_call in tool_calls_data:
                     if tool_call["name"] and tool_call["arguments"]:
                         try:
                             args = json.loads(tool_call["arguments"])
                             result = execute_tool(tool_call["name"], args)
                             self._on_tool_result(tool_call["name"], result)
-                            
-                            # 添加到聊天历史（作为 function result）
-                            self.chat_history.append({
-                                "role": "assistant",
-                                "content": None,
-                                "tool_calls": [{
-                                    "id": "call_1",
-                                    "type": "function",
-                                    "function": {
-                                        "name": tool_call["name"],
-                                        "arguments": tool_call["arguments"]
-                                    }
-                                }]
+
+                            # 保存工具调用信息到历史
+                            tool_calls_for_history.append({
+                                "id": tool_call["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": tool_call["name"],
+                                    "arguments": tool_call["arguments"]
+                                }
                             })
-                            
+
+                            # 添加工具结果到历史
+                            self.chat_history.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call["id"],
+                                "content": json.dumps(result, ensure_ascii=False)
+                            })
+
                         except Exception as e:
                             self._on_tool_result(tool_call["name"], {
                                 "success": False,
                                 "message": f"执行出错: {e}"
                             })
-            
-            # 保存到历史
-            if full_content:
-                self.chat_history.append({"role": "assistant", "content": full_content})
-                self.log_manager.chat_assistant(full_content)
-            
+
+                            # 即使出错也要添加到历史
+                            tool_calls_for_history.append({
+                                "id": tool_call["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": tool_call["name"],
+                                    "arguments": tool_call["arguments"]
+                                }
+                            })
+                            self.chat_history.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call["id"],
+                                "content": json.dumps({"success": False, "message": str(e)}, ensure_ascii=False)
+                            })
+
+                # 添加 assistant 的工具调用消息到历史（如果有工具调用）
+                if tool_calls_for_history:
+                    assistant_msg = {
+                        "role": "assistant",
+                        "tool_calls": tool_calls_for_history
+                    }
+                    # 如果有文本内容，也要包含进去
+                    if full_content:
+                        assistant_msg["content"] = full_content
+                    self.chat_history.append(assistant_msg)
+
             self._on_stream_complete()
-            
+
         except Exception as e:
             self._on_stream_error(str(e))
     
