@@ -1,6 +1,6 @@
 # PyMOL AI Assistant 插件
 
-通过 AI 工具技能控制 PyMOL 分子可视化软件。
+用人话（自然语言）控制 PyMOL。
 
 ## 代码仓库
 
