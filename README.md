@@ -136,15 +136,24 @@
 
 ## 默认配置
 
-插件预置了 SiliconFlow 和 OpenAI 的默认配置：
+### SiliconFlow 推荐配置（推荐使用）
 
-- **SiliconFlow**
-  - API URL: `https://api.siliconflow.cn/v1`
-  - 模型: `Pro/moonshotai/Kimi-K2.5`
+插件预置了 SiliconFlow 的配置：
 
-- **OpenAI**
-  - API URL: `https://api.openai.com/v1`
-  - 模型: `gpt-4o`
+- **API URL**: `https://api.siliconflow.cn/v1`
+- **推荐模型**:
+  - `Pro/moonshotai/Kimi-K2.5` （综合最佳，推荐优先使用）
+  - `Pro/zai-org/GLM-4.7`
+  - `deepseek-ai/DeepSeek-V3.2` （需充值使用）
+
+**注册指南**：
+- 使用邀请链接注册可获得 16 元代金券：https://cloud.siliconflow.cn/i/Su2ao83G
+- 也可以直接访问 Kimi 官网购买包月计划
+
+### OpenAI 配置
+
+- **API URL**: `https://api.openai.com/v1`
+- **模型**: `gpt-4o`
 
 ## 依赖项
 
