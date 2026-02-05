@@ -13,33 +13,13 @@
 
 ## 安装方法
 
-### 方法 1：通过 Plugin Manager 安装（推荐）
+### 通过 Plugin Manager 安装
 
-1. 下载 `pymol-ai-assistant.zip`
+1. 下载最新版本：[pymol-ai-assistant.zip](https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest)
 2. 打开 PyMOL → Plugin → Plugin Manager
 3. 点击 "Install New Plugin"
 4. 选择下载的 zip 文件
 5. 重启 PyMOL
-
-### 方法 2：手动安装
-
-如果 Plugin Manager 安装失败，请使用手动安装：
-
-1. 解压 `pymol-ai-assistant.zip`
-2. 将解压后的 `pymol-ai-assistant` 文件夹复制到 PyMOL 插件目录：
-   - **Windows**: `%USERPROFILE%\AppData\Roaming\PyMOL\startup\`
-   - **macOS**: `~/Library/Preferences/PyMOL/startup/`
-   - **Linux**: `~/.pymol/startup/`
-3. 重启 PyMOL
-
-### 方法 3：使用安装脚本
-
-1. 解压 `pymol-ai-assistant.zip`
-2. 在 PyMOL 命令行中运行：
-   ```
-   run /path/to/pymol-ai-assistant/install.py
-   ```
-3. 按提示完成安装
 
 ## 使用方法
 
@@ -210,6 +190,15 @@ pip install openai>=1.0.0 aiohttp>=3.8.0
 3. 流式响应需要稳定的网络连接
 
 ## 版本历史
+
+### v1.3.1
+- 修复 thinking 模式下工具调用报错问题
+- 更换为 PyMOL 风格深色主题
+- 优化滚动条样式
+- 配置项"默认"改为"当前使用"
+
+### v1.3.0
+- 优化 AI 流式响应处理
 
 ### v1.2.0
 - 新增 `pymol_get_selection_details`: 获取选择集详细残基信息
