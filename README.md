@@ -138,7 +138,7 @@
 
 ### SiliconFlow 推荐配置（推荐使用）
 
-插件预置了 SiliconFlow 的配置：
+以下是推荐的 SiliconFlow 配置参数：
 
 - **API URL**: `https://api.siliconflow.cn/v1`
 - **推荐模型**:
