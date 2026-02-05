@@ -83,12 +83,27 @@
 创建一个选择集，选中 chain A 的所有原子
 ```
 
+```
+执行 PyMOL 脚本 /path/to/script.pml
+```
+
+```
+运行命令：load 1ake; show cartoon; color chain
+```
+
+```
+加载并运行 Python 脚本 /path/to/setup.py
+```
+
 ## 支持的 AI 工具
 
 | 工具名 | 功能 |
 |--------|------|
 | pymol_fetch | 从 PDB 下载结构 |
 | pymol_load | 加载本地文件 |
+| pymol_run_script | 执行 Python 脚本（.py/.pym） |
+| pymol_run_pml | 执行 PyMOL 脚本（.pml） |
+| pymol_do_command | 执行 PyMOL 命令 |
 | pymol_show | 显示表示形式 |
 | pymol_hide | 隐藏表示形式 |
 | pymol_color | 设置颜色 |
@@ -102,6 +117,8 @@
 | pymol_get_info | 获取分子信息 |
 | pymol_reset | 重置视图 |
 | pymol_center | 居中视图 |
+| pymol_remove | 删除对象或选择集 |
+| pymol_set | 设置 PyMOL 参数 |
 
 ## 默认配置
 
@@ -171,6 +188,14 @@ pip install openai>=1.0.0 aiohttp>=3.8.0
 3. 流式响应需要稳定的网络连接
 
 ## 版本历史
+
+### v1.1.0
+- 新增脚本执行支持（Python .py/.pym 和 PyMOL .pml）
+- 新增 `pymol_do_command` 工具执行 PyMOL 命令
+- 新增 `pymol_remove` 和 `pymol_set` 工具
+- 改进颜色方案支持（by_ss, by_resi）
+- 改进标签功能和参数说明
+- 根据 PyMOL 源码优化工具实现
 
 ### v1.0.0
 - 初始版本
