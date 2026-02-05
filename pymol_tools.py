@@ -153,7 +153,7 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
                         "include_atoms": {
                             "type": "boolean",
                             "description": "是否包含每个原子的详细信息（原子名、元素、坐标等）",
-                            "default": false
+                            "default": "false"
                         }
                     },
                     "required": []
