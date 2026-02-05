@@ -7,6 +7,7 @@ PyMOL 工具集
 
 import os
 import json
+import traceback
 from typing import Dict, List, Any, Optional, Callable
 
 
@@ -652,12 +653,18 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         执行结果字典
     """
+    # 打印调试信息到 PyMOL 控制台（这样更容易看到）
+    print(f"[PyMOL AI Assistant] 执行工具: {tool_name}")
+    print(f"[PyMOL AI Assistant] 参数: {json.dumps(arguments, ensure_ascii=False)}")
+
     try:
         from pymol import cmd
     except ImportError:
+        error_msg = "无法导入 PyMOL cmd 模块"
+        print(f"[PyMOL AI Assistant] 错误: {error_msg}")
         return {
             "success": False,
-            "message": "无法导入 PyMOL cmd 模块"
+            "message": error_msg
         }
 
     try:
@@ -1254,15 +1261,23 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
             }
 
         else:
+            error_msg = f"未知工具: {tool_name}"
+            print(f"[PyMOL AI Assistant] 错误: {error_msg}")
+            print(f"[PyMOL AI Assistant] 可用工具: {[t['function']['name'] for t in get_tool_definitions()]}")
             return {
                 "success": False,
-                "message": f"未知工具: {tool_name}"
+                "message": error_msg
             }
 
     except Exception as e:
-        import traceback
+        error_msg = f"执行出错: {str(e)}"
+        tb = traceback.format_exc()
+        print(f"[PyMOL AI Assistant] 异常: {error_msg}")
+        print(f"[PyMOL AI Assistant] 工具: {tool_name}")
+        print(f"[PyMOL AI Assistant] 参数: {arguments}")
+        print(f"[PyMOL AI Assistant] Traceback:\n{tb}")
         return {
             "success": False,
-            "message": f"执行出错: {str(e)}",
-            "error": traceback.format_exc()
+            "message": error_msg,
+            "error": tb
         }

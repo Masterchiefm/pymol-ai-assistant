@@ -12,6 +12,7 @@ import sys
 import json
 import asyncio
 import threading
+import traceback
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -741,29 +742,37 @@ class AIChatWindow(QtWidgets.QMainWindow):
     
     def send_message(self):
         """发送消息"""
+        self.log_manager.debug("send_message 被调用", LogType.SYSTEM)
+
         if self.is_streaming:
+            self.log_manager.debug("is_streaming=True，忽略发送请求", LogType.SYSTEM)
             return
-        
+
         message = self.input_text.toPlainText().strip()
         if not message:
+            self.log_manager.debug("消息为空，忽略", LogType.SYSTEM)
             return
-        
+
         if not self.current_config:
+            self.log_manager.error("未配置 API 配置", LogType.SYSTEM)
             QtWidgets.QMessageBox.warning(self, "警告", "请先配置 API")
             return
-        
+
+        self.log_manager.info(f"用户发送消息: {message[:100]}...", LogType.CHAT)
+
         # 清空输入
         self.input_text.clear()
-        
+
         # 显示用户消息
         user_widget = self.add_message_widget("user")
         user_widget.add_text(message, "output")
-        
+
         self.log_manager.chat_user(message)
-        
+
         # 添加到历史
         self.chat_history.append({"role": "user", "content": message})
-        
+        self.log_manager.debug(f"当前对话历史长度: {len(self.chat_history)}", LogType.SYSTEM)
+
         # 开始流式响应
         self.start_streaming_response()
     
@@ -785,32 +794,45 @@ class AIChatWindow(QtWidgets.QMainWindow):
     
     def _run_ai_stream(self):
         """在后台线程中运行 AI 流式请求"""
+        self.log_manager.debug("开始 AI 流式请求线程", LogType.SYSTEM)
         try:
             asyncio.run(self._stream_ai_response())
+            self.log_manager.debug("AI 流式请求线程完成", LogType.SYSTEM)
         except Exception as e:
+            error_detail = f"{str(e)}\n{traceback.format_exc()}"
+            self.log_manager.error(f"AI 流式请求线程异常: {error_detail}", LogType.SYSTEM)
             self._on_stream_error(str(e))
     
     async def _stream_ai_response(self):
         """流式 AI 响应（支持多轮工具调用）"""
+        self.log_manager.debug("开始流式 AI 响应", LogType.SYSTEM)
+
         try:
             from openai import AsyncOpenAI
-        except ImportError:
+            self.log_manager.debug("成功导入 openai.AsyncOpenAI", LogType.SYSTEM)
+        except ImportError as e:
+            self.log_manager.error(f"缺少 openai 包: {e}\n{traceback.format_exc()}", LogType.SYSTEM)
             self._on_stream_error("缺少 openai 包，请安装: pip install openai")
             return
 
         config = self.current_config
         if not config:
+            self.log_manager.error("未配置 API 配置", LogType.SYSTEM)
             self._on_stream_error("未配置 API")
             return
+
+        self.log_manager.debug(f"使用配置: {config.name}, 模型: {config.model}", LogType.SYSTEM)
 
         try:
             client = AsyncOpenAI(
                 api_key=config.api_key,
                 base_url=config.api_url
             )
+            self.log_manager.debug("创建 AsyncOpenAI 客户端成功", LogType.SYSTEM)
 
             # 准备工具
             tools = get_tool_definitions()
+            self.log_manager.debug(f"加载 {len(tools)} 个工具定义", LogType.SYSTEM)
 
             # 循环处理，直到 AI 不再调用工具
             max_iterations = 10  # 防止无限循环
@@ -818,15 +840,19 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
             while iteration < max_iterations:
                 iteration += 1
+                self.log_manager.debug(f"工具调用循环 iteration={iteration}/{max_iterations}", LogType.SYSTEM)
 
                 # 准备消息
                 messages = self.chat_history.copy()
+                self.log_manager.debug(f"准备消息: {len(messages)} 条", LogType.SYSTEM)
 
                 # 添加系统提示
                 system_prompt = self._get_system_prompt()
                 messages.insert(0, {"role": "system", "content": system_prompt})
+                self.log_manager.debug("添加系统提示", LogType.SYSTEM)
 
                 # 发送请求
+                self.log_manager.debug(f"发送 API 请求到 {config.api_url}", LogType.SYSTEM)
                 response = await client.chat.completions.create(
                     model=config.model,
                     messages=messages,
@@ -834,6 +860,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
                     tool_choice="auto",
                     stream=True
                 )
+                self.log_manager.debug("开始接收流式响应", LogType.SYSTEM)
 
                 # 处理流式响应
                 full_content = ""
@@ -856,6 +883,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
                     if delta.tool_calls:
                         for tc in delta.tool_calls:
                             index = tc.index
+                            self.log_manager.debug(f"收到工具调用 delta: index={index}", LogType.TOOL_CALL)
 
                             # 确保有足够的空间
                             while len(tool_calls_data) <= index:
@@ -863,18 +891,26 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
                             if tc.id:
                                 tool_calls_data[index]["id"] = tc.id
+                                self.log_manager.debug(f"工具调用 ID: {tc.id}", LogType.TOOL_CALL)
                             if tc.function:
                                 if tc.function.name:
                                     tool_calls_data[index]["name"] = tc.function.name
+                                    self.log_manager.debug(f"工具名称: {tc.function.name}", LogType.TOOL_CALL)
                                 if tc.function.arguments:
                                     tool_calls_data[index]["arguments"] += tc.function.arguments
+                                    self.log_manager.debug(f"工具参数片段: {tc.function.arguments}", LogType.TOOL_CALL)
 
                                     # 尝试解析参数并显示
                                     try:
                                         args = json.loads(tool_calls_data[index]["arguments"])
                                         self._on_tool_call(tool_calls_data[index]["name"], args)
-                                    except:
-                                        pass
+                                        self.log_manager.debug(f"成功解析工具参数: {tool_calls_data[index]['name']}", LogType.TOOL_CALL)
+                                    except json.JSONDecodeError as e:
+                                        self.log_manager.debug(f"参数未完全接收，等待更多数据: {e}", LogType.TOOL_CALL)
+                                    except Exception as e:
+                                        self.log_manager.error(f"解析工具参数失败: {e}\n{traceback.format_exc()}", LogType.TOOL_CALL)
+
+                self.log_manager.debug(f"流式响应完成: content_length={len(full_content)}, tool_calls={len(tool_calls_data)}", LogType.SYSTEM)
 
                 # 处理工具调用
                 tool_calls_for_history = []
@@ -885,20 +921,29 @@ class AIChatWindow(QtWidgets.QMainWindow):
                         self.chat_history.append({"role": "assistant", "content": full_content})
                         self.log_manager.chat_assistant(full_content)
                     break
+
+                self.log_manager.debug(f"执行 {len(tool_calls_data)} 个工具调用", LogType.SYSTEM)
+
                 for tool_call in tool_calls_data:
                     if tool_call["name"] and tool_call["arguments"]:
+                        tool_name = tool_call["name"]
+                        args_str = tool_call["arguments"]
+                        self.log_manager.info(f"准备执行工具: {tool_name}, args_length={len(args_str)}", LogType.TOOL_CALL)
+
                         try:
-                            args = json.loads(tool_call["arguments"])
-                            result = execute_tool(tool_call["name"], args)
-                            self._on_tool_result(tool_call["name"], result)
+                            args = json.loads(args_str)
+                            self.log_manager.debug(f"解析工具参数成功: {tool_name}", LogType.TOOL_CALL)
+                            result = execute_tool(tool_name, args)
+                            self.log_manager.tool_result(tool_name, result)
+                            self._on_tool_result(tool_name, result)
 
                             # 保存工具调用信息到历史
                             tool_calls_for_history.append({
                                 "id": tool_call["id"],
                                 "type": "function",
                                 "function": {
-                                    "name": tool_call["name"],
-                                    "arguments": tool_call["arguments"]
+                                    "name": tool_name,
+                                    "arguments": args_str
                                 }
                             })
 
@@ -910,36 +955,42 @@ class AIChatWindow(QtWidgets.QMainWindow):
                             })
 
                         except json.JSONDecodeError as e:
-                            self._on_tool_result(tool_call["name"], {
+                            error_msg = f"参数解析失败: {e}"
+                            self.log_manager.error(f"{tool_name} {error_msg}\n参数内容: {args_str}\n{traceback.format_exc()}", LogType.TOOL_CALL)
+                            error_result = {
                                 "success": False,
-                                "message": f"参数解析失败: {e}"
-                            })
+                                "message": error_msg
+                            }
+                            self._on_tool_result(tool_name, error_result)
                             tool_calls_for_history.append({
                                 "id": tool_call["id"],
                                 "type": "function",
                                 "function": {
-                                    "name": tool_call["name"],
-                                    "arguments": tool_call["arguments"]
+                                    "name": tool_name,
+                                    "arguments": args_str
                                 }
                             })
                             self.chat_history.append({
                                 "role": "tool",
                                 "tool_call_id": tool_call["id"],
-                                "content": json.dumps({"success": False, "message": f"参数解析失败: {e}"}, ensure_ascii=False)
+                                "content": json.dumps({"success": False, "message": error_msg}, ensure_ascii=False)
                             })
                         except Exception as e:
-                            self._on_tool_result(tool_call["name"], {
+                            error_msg = f"执行出错: {e}"
+                            self.log_manager.error(f"{tool_name} {error_msg}\n{traceback.format_exc()}", LogType.TOOL_CALL)
+                            error_result = {
                                 "success": False,
-                                "message": f"执行出错: {e}"
-                            })
+                                "message": error_msg
+                            }
+                            self._on_tool_result(tool_name, error_result)
 
                             # 即使出错也要添加到历史
                             tool_calls_for_history.append({
                                 "id": tool_call["id"],
                                 "type": "function",
                                 "function": {
-                                    "name": tool_call["name"],
-                                    "arguments": tool_call["arguments"]
+                                    "name": tool_name,
+                                    "arguments": args_str
                                 }
                             })
                             self.chat_history.append({
@@ -958,10 +1009,14 @@ class AIChatWindow(QtWidgets.QMainWindow):
                     if full_content:
                         assistant_msg["content"] = full_content
                     self.chat_history.append(assistant_msg)
+                    self.log_manager.debug(f"添加 {len(tool_calls_for_history)} 个工具调用到历史", LogType.SYSTEM)
 
             self._on_stream_complete()
+            self.log_manager.info("流式响应完全结束", LogType.SYSTEM)
 
         except Exception as e:
+            error_detail = f"{str(e)}\n{traceback.format_exc()}"
+            self.log_manager.error(f"流式响应异常: {error_detail}", LogType.SYSTEM)
             self._on_stream_error(str(e))
     
     def _get_system_prompt(self) -> str:
@@ -1111,14 +1166,15 @@ class AIChatWindow(QtWidgets.QMainWindow):
     @QtCore.Slot(str)
     def _handle_stream_error(self, error: str):
         """处理流式错误"""
+        self.log_manager.error(f"处理流式错误: {error}\n{traceback.format_exc()}", LogType.SYSTEM)
         self.is_streaming = False
         self.send_btn.setEnabled(True)
         self.send_btn.setText("发送")
         self.status_bar.showMessage(f"错误: {error}")
-        
+
         if self.current_message_widget:
             self.current_message_widget.add_text(f"错误: {error}", "tool_result")
-        
+
         self.log_manager.error(f"AI 流式响应错误: {error}")
         self.scroll_to_bottom()
 
