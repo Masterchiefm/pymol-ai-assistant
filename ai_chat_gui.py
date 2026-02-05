@@ -1046,6 +1046,9 @@ class AIChatWindow(QtWidgets.QMainWindow):
 - pymol_ray: 光线追踪渲染
 - pymol_png: 保存图像
 
+计算距离时：
+- 如果用户要求计算两个 selection 或两个对象之间的距离，且没有指定具体原子，则计算两个 selection/对象中第一个原子之间的距离。
+
 当用户询问关于当前选择的信息（如"选中的是什么氨基酸"），使用 pymol_get_selection_details 获取详细信息。
 当用户请求涉及 PyMOL 操作时，请使用相应工具。使用工具后，向用户解释你做了什么。
 

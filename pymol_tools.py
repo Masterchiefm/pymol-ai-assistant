@@ -1030,10 +1030,26 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
             selection2 = arguments.get("selection2", "")
 
             try:
-                distance = cmd.get_distance(selection1, selection2)
+                # 检查是否是对象名（通过检查是否有空格或特殊字符）
+                # 简单判断：如果 selection 不包含空格、括号等，可能是对象名
+                def is_object_name(s):
+                    # 检查是否在对象列表中
+                    objects = cmd.get_names("objects")
+                    return s in objects
+
+                # 如果是对象名，计算第一个原子之间的距离
+                if is_object_name(selection1) and is_object_name(selection2):
+                    sel1_first = f"first ({selection1})"
+                    sel2_first = f"first ({selection2})"
+                    distance = cmd.get_distance(sel1_first, sel2_first)
+                    note = "（第一个原子之间的距离）"
+                else:
+                    distance = cmd.get_distance(selection1, selection2)
+                    note = ""
+
                 return {
                     "success": True,
-                    "message": f"距离: {distance:.3f} Å",
+                    "message": f"距离: {distance:.3f} Å{note}",
                     "data": {"selection1": selection1, "selection2": selection2, "distance": distance}
                 }
             except Exception as e:
