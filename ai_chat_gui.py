@@ -563,41 +563,44 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.chat_history: List[Dict[str, Any]] = []
         self.is_streaming = False
         self.current_message_widget: Optional[ChatMessageWidget] = None
-        
+
         self.setup_ui()
         self.load_default_config()
-    
+
     def setup_ui(self):
         """设置界面"""
         # 中央部件
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
-        
+
         # 主布局
-        main_layout = QtWidgets.QHBoxLayout(central)
-        
-        # 左侧：聊天区域
-        left_panel = QtWidgets.QWidget()
-        left_layout = QtWidgets.QVBoxLayout(left_panel)
-        
+        main_layout = QtWidgets.QVBoxLayout(central)
+
+        # 主标签页
+        main_tabs = QtWidgets.QTabWidget()
+
+        # === 标签1: AI 对话 ===
+        chat_tab = QtWidgets.QWidget()
+        chat_layout = QtWidgets.QVBoxLayout(chat_tab)
+
         # 工具栏
         toolbar = QtWidgets.QHBoxLayout()
-        
+
         self.config_label = QtWidgets.QLabel("API: 未配置")
         toolbar.addWidget(self.config_label)
-        
+
         toolbar.addStretch()
-        
+
         self.config_btn = QtWidgets.QPushButton("⚙️ 配置")
         self.config_btn.clicked.connect(self.open_config_dialog)
         toolbar.addWidget(self.config_btn)
-        
+
         self.clear_btn = QtWidgets.QPushButton("🗑️ 清空")
         self.clear_btn.clicked.connect(self.clear_chat)
         toolbar.addWidget(self.clear_btn)
-        
-        left_layout.addLayout(toolbar)
-        
+
+        chat_layout.addLayout(toolbar)
+
         # 聊天滚动区域
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
@@ -608,20 +611,20 @@ class AIChatWindow(QtWidgets.QMainWindow):
                 background-color: #f5f5f5;
             }
         """)
-        
+
         self.chat_container = QtWidgets.QWidget()
         self.chat_layout = QtWidgets.QVBoxLayout(self.chat_container)
         self.chat_layout.setAlignment(Qt.AlignTop)
         self.chat_layout.setSpacing(4)
         self.chat_layout.addStretch()
-        
+
         scroll.setWidget(self.chat_container)
-        left_layout.addWidget(scroll)
+        chat_layout.addWidget(scroll)
         self.chat_scroll = scroll
-        
+
         # 输入区域
         input_layout = QtWidgets.QHBoxLayout()
-        
+
         self.input_text = QtWidgets.QTextEdit()
         self.input_text.setPlaceholderText("输入消息... (Enter 发送, Shift+Enter 换行)")
         self.input_text.setMaximumHeight(80)
@@ -635,7 +638,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         """)
         self.input_text.installEventFilter(self)
         input_layout.addWidget(self.input_text, stretch=1)
-        
+
         self.send_btn = QtWidgets.QPushButton("发送")
         self.send_btn.setMinimumHeight(60)
         self.send_btn.setStyleSheet("""
@@ -656,33 +659,16 @@ class AIChatWindow(QtWidgets.QMainWindow):
         """)
         self.send_btn.clicked.connect(self.send_message)
         input_layout.addWidget(self.send_btn)
-        
-        left_layout.addLayout(input_layout)
-        
-        main_layout.addWidget(left_panel, stretch=2)
-        
-        # 右侧：标签页（工具调用 + 日志）
-        right_tabs = QtWidgets.QTabWidget()
-        
-        # 工具调用面板
-        self.tools_panel = QtWidgets.QTextEdit()
-        self.tools_panel.setReadOnly(True)
-        self.tools_panel.setStyleSheet("""
-            QTextEdit {
-                background-color: #f8f9fa;
-                font-family: Consolas, Monaco, monospace;
-                font-size: 11px;
-                border: 1px solid #dee2e6;
-                border-radius: 4px;
-            }
-        """)
-        right_tabs.addTab(self.tools_panel, "🔧 工具调用")
-        
-        # 日志面板
+
+        chat_layout.addLayout(input_layout)
+
+        main_tabs.addTab(chat_tab, "💬 AI 对话")
+
+        # === 标签2: 日志 ===
         self.log_panel = LogPanel()
-        right_tabs.addTab(self.log_panel, "📋 日志")
-        
-        main_layout.addWidget(right_tabs, stretch=1)
+        main_tabs.addTab(self.log_panel, "📋 日志")
+
+        main_layout.addWidget(main_tabs)
         
         # 状态栏
         self.status_bar = QtWidgets.QStatusBar()
@@ -718,10 +704,9 @@ class AIChatWindow(QtWidgets.QMainWindow):
             item = self.chat_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        
+
         self.chat_history.clear()
         self.current_message_widget = None
-        self.tools_panel.clear()
         self.log_manager.info("聊天已清空")
     
     def add_message_widget(self, role: str) -> ChatMessageWidget:
@@ -1097,14 +1082,10 @@ class AIChatWindow(QtWidgets.QMainWindow):
         if self.current_message_widget:
             display_text = f"调用 {tool_name}({json.dumps(arguments, ensure_ascii=False)})"
             self.current_message_widget.add_text(display_text, "tool_call")
-        
-        # 在工具面板中记录
-        self.tools_panel.append(f"⚙️ 调用: {tool_name}")
-        self.tools_panel.append(f"   参数: {json.dumps(arguments, indent=2, ensure_ascii=False)}")
-        
+
         # 记录日志
         self.log_manager.tool_call(tool_name, arguments)
-        
+
         self.scroll_to_bottom()
     
     def _on_tool_result(self, tool_name: str, result: Dict[str, Any]):
@@ -1121,22 +1102,16 @@ class AIChatWindow(QtWidgets.QMainWindow):
         """更新工具结果显示"""
         success = result.get("success", False)
         message = result.get("message", "")
-        
+
         # 在聊天中显示结果
         if self.current_message_widget:
             status = "✓" if success else "✗"
             display_text = f"{status} {tool_name}: {message}"
             self.current_message_widget.add_text(display_text, "tool_result")
-        
-        # 在工具面板中记录
-        status_text = "成功" if success else "失败"
-        self.tools_panel.append(f"✓ 结果: {status_text}")
-        self.tools_panel.append(f"   {message}")
-        self.tools_panel.append("")
-        
+
         # 记录日志
         self.log_manager.tool_result(tool_name, result)
-        
+
         self.scroll_to_bottom()
     
     def _on_stream_complete(self):
