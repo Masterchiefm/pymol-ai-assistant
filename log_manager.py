@@ -30,12 +30,15 @@ class LogLevel(Enum):
 
 class LogType(Enum):
     """日志类型"""
-    SYSTEM = "system"      # 系统日志
-    CHAT = "chat"          # AI 对话
-    TOOL_CALL = "tool_call" # 工具调用
-    TOOL_RESULT = "tool_result" # 工具结果
-    THINKING = "thinking"  # AI 思考过程
-    RESPONSE = "response"  # AI 回复
+    SYSTEM = "system"           # 系统日志（初始化、配置等）
+    API = "api"                 # API 请求/响应
+    CHAT_USER = "chat_user"     # 用户消息
+    CHAT_ASSISTANT = "chat_assistant"  # AI 回复
+    TOOL_CALL = "tool_call"     # 工具调用请求
+    TOOL_EXEC = "tool_exec"     # 工具执行过程
+    TOOL_RESULT = "tool_result" # 工具执行结果
+    THINKING = "thinking"       # AI 思考过程
+    ERROR = "error"             # 错误信息
 
 
 @dataclass
@@ -155,11 +158,11 @@ class LogManager:
     
     def chat_user(self, message: str):
         """记录用户消息"""
-        return self.log(message, LogLevel.INFO, LogType.CHAT, {"role": "user"})
+        return self.log(message, LogLevel.INFO, LogType.CHAT_USER, {"role": "user"})
     
     def chat_assistant(self, message: str):
         """记录助手消息"""
-        return self.log(message, LogLevel.INFO, LogType.CHAT, {"role": "assistant"})
+        return self.log(message, LogLevel.INFO, LogType.CHAT_ASSISTANT, {"role": "assistant"})
     
     def thinking(self, message: str):
         """记录 AI 思考过程"""
@@ -168,7 +171,7 @@ class LogManager:
     def tool_call(self, tool_name: str, arguments: Dict[str, Any]):
         """记录工具调用"""
         return self.log(
-            f"调用: {tool_name}",
+            f"📤 调用: {tool_name}",
             LogLevel.INFO,
             LogType.TOOL_CALL,
             {"tool_name": tool_name, "arguments": arguments}
@@ -178,9 +181,9 @@ class LogManager:
         """记录工具结果"""
         success = result.get("success", False)
         message = result.get("message", "")
-        status = "成功" if success else "失败"
+        icon = "✓" if success else "✗"
         return self.log(
-            f"结果: {tool_name} - {status}: {message}",
+            f"  │  └─ {icon} {tool_name}: {message}",
             LogLevel.INFO,
             LogType.TOOL_RESULT,
             {"tool_name": tool_name, "result": result}

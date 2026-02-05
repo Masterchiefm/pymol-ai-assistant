@@ -13,6 +13,7 @@ import json
 import asyncio
 import threading
 import traceback
+import copy
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -52,16 +53,16 @@ class ChatMessageWidget(QtWidgets.QFrame):
         
         if self.role == "user":
             role_text = "👤 你"
-            role_color = "#007bff"
+            role_color = "#569cd6"  # PyMOL 蓝色
         elif self.role == "assistant":
             role_text = "🤖 AI"
-            role_color = "#28a745"
+            role_color = "#4ec9b0"  # PyMOL 青色
         elif self.role == "tool":
             role_text = "🔧 工具"
-            role_color = "#fd7e14"
+            role_color = "#dcdcaa"  # PyMOL 黄色
         else:
             role_text = ""
-            role_color = "#666"
+            role_color = "#808080"
         
         if role_text:
             self.role_label = QtWidgets.QLabel(f"<b style='color: {role_color};'>{role_text}</b>")
@@ -77,12 +78,12 @@ class ChatMessageWidget(QtWidgets.QFrame):
         layout.addLayout(self.content_layout)
     
     def get_style(self) -> str:
-        """根据角色返回样式"""
+        """根据角色返回样式 - PyMOL 深色主题"""
         if self.role == "user":
             return """
                 QFrame {
-                    background-color: #e3f2fd;
-                    border: 1px solid #90caf9;
+                    background-color: #2d3d4d;
+                    border: 1px solid #3e5f7f;
                     border-radius: 8px;
                     margin: 2px 40px 2px 2px;
                 }
@@ -90,8 +91,8 @@ class ChatMessageWidget(QtWidgets.QFrame):
         elif self.role == "assistant":
             return """
                 QFrame {
-                    background-color: #f1f8e9;
-                    border: 1px solid #aed581;
+                    background-color: #2d3d3d;
+                    border: 1px solid #3e7f6f;
                     border-radius: 8px;
                     margin: 2px 2px 2px 40px;
                 }
@@ -99,8 +100,8 @@ class ChatMessageWidget(QtWidgets.QFrame):
         elif self.role == "tool":
             return """
                 QFrame {
-                    background-color: #fff3e0;
-                    border: 1px solid #ffcc80;
+                    background-color: #3d3d2d;
+                    border: 1px solid #7f7f3e;
                     border-radius: 4px;
                     margin: 1px 15px 1px 15px;
                 }
@@ -137,14 +138,14 @@ class ChatMessageWidget(QtWidgets.QFrame):
             # 设置大小策略为 Preferred，确保高度自适应
             text_edit.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
             
-            # 根据样式设置文本颜色
+            # 根据样式设置文本颜色 - PyMOL 深色主题
             if style == "thinking":
                 text_edit.setStyleSheet("""
                     QTextEdit {
                         background-color: transparent;
                         border: none;
                         font-size: 12px;
-                        color: #6c757d;
+                        color: #9cdcfe;
                         font-style: italic;
                         padding: 0px;
                         margin: 0px;
@@ -156,7 +157,7 @@ class ChatMessageWidget(QtWidgets.QFrame):
                         background-color: transparent;
                         border: none;
                         font-size: 13px;
-                        color: #212529;
+                        color: #d4d4d4;
                         padding: 0px;
                         margin: 0px;
                     }
@@ -167,7 +168,7 @@ class ChatMessageWidget(QtWidgets.QFrame):
                         background-color: transparent;
                         border: none;
                         font-size: 11px;
-                        color: #fd7e14;
+                        color: #dcdcaa;
                         font-family: Consolas, Monaco, monospace;
                         padding: 0px;
                         margin: 0px;
@@ -179,7 +180,7 @@ class ChatMessageWidget(QtWidgets.QFrame):
                         background-color: transparent;
                         border: none;
                         font-size: 11px;
-                        color: #20c997;
+                        color: #4ec9b0;
                         font-family: Consolas, Monaco, monospace;
                         padding: 0px;
                         margin: 0px;
@@ -243,7 +244,7 @@ class LogPanel(QtWidgets.QWidget):
         toolbar = QtWidgets.QHBoxLayout()
         
         self.filter_combo = QtWidgets.QComboBox()
-        self.filter_combo.addItems(["全部", "系统", "对话", "工具调用", "思考", "回复"])
+        self.filter_combo.addItems(["全部", "系统", "API", "对话", "AI回复", "工具调用", "工具执行", "工具结果", "思考", "错误"])
         self.filter_combo.currentTextChanged.connect(self.apply_filter)
         toolbar.addWidget(QtWidgets.QLabel("过滤:"))
         toolbar.addWidget(self.filter_combo)
@@ -303,10 +304,14 @@ class LogPanel(QtWidgets.QWidget):
         type_map = {
             "全部": None,
             "系统": LogType.SYSTEM,
-            "对话": LogType.CHAT,
+            "API": LogType.API,
+            "对话": LogType.CHAT_USER,
+            "AI回复": LogType.CHAT_ASSISTANT,
             "工具调用": LogType.TOOL_CALL,
+            "工具执行": LogType.TOOL_EXEC,
+            "工具结果": LogType.TOOL_RESULT,
             "思考": LogType.THINKING,
-            "回复": LogType.RESPONSE
+            "错误": LogType.ERROR
         }
         
         target_type = type_map.get(filter_text)
@@ -326,11 +331,14 @@ class LogPanel(QtWidgets.QWidget):
         }
         
         type_color_map = {
-            LogType.TOOL_CALL.value: "#4ec9b0",
-            LogType.TOOL_RESULT.value: "#4ec9b0",
-            LogType.THINKING.value: "#9cdcfe",
-            LogType.CHAT.value: "#ce9178",
-            LogType.RESPONSE.value: "#b5cea8"
+            LogType.API.value: "#c586c0",           # 紫色
+            LogType.CHAT_USER.value: "#ce9178",     # 橙色
+            LogType.CHAT_ASSISTANT.value: "#b5cea8", # 浅绿
+            LogType.TOOL_CALL.value: "#4ec9b0",     # 青色
+            LogType.TOOL_EXEC.value: "#dcdcaa",     # 黄色
+            LogType.TOOL_RESULT.value: "#569cd6",   # 蓝色
+            LogType.THINKING.value: "#9cdcfe",      # 浅蓝
+            LogType.ERROR.value: "#f44747"          # 红色
         }
         
         color = type_color_map.get(entry.type, color_map.get(entry.level, "#d4d4d4"))
@@ -385,6 +393,59 @@ class ConfigDialog(QtWidgets.QDialog):
         self.setMinimumWidth(500)
         self.setMinimumHeight(400)
         
+        # 深色主题样式
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e1e;
+            }
+            QWidget {
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+            }
+            QLabel {
+                color: #d4d4d4;
+            }
+            QLineEdit {
+                background-color: #2d2d2d;
+                color: #d4d4d4;
+                border: 1px solid #3e3e3e;
+                padding: 6px;
+                border-radius: 4px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #0078d4;
+            }
+            QCheckBox {
+                color: #d4d4d4;
+            }
+            QListWidget {
+                background-color: #2d2d2d;
+                color: #d4d4d4;
+                border: 1px solid #3e3e3e;
+                border-radius: 4px;
+            }
+            QListWidget::item:selected {
+                background-color: #094771;
+            }
+            QPushButton {
+                background-color: #3c3c3c;
+                color: #d4d4d4;
+                border: 1px solid #5c5c5c;
+                padding: 6px 12px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #4c4c4c;
+            }
+            QPushButton:default {
+                background-color: #0e639c;
+                border: 1px solid #0e639c;
+            }
+            QPushButton:default:hover {
+                background-color: #1177bb;
+            }
+        """)
+        
         layout = QtWidgets.QVBoxLayout(self)
         
         # 配置列表
@@ -413,7 +474,7 @@ class ConfigDialog(QtWidgets.QDialog):
         self.model_input.setPlaceholderText("模型名称（如 gpt-4o）")
         form_layout.addRow("模型:", self.model_input)
         
-        self.default_check = QtWidgets.QCheckBox("设为默认配置")
+        self.default_check = QtWidgets.QCheckBox("设为当前使用配置")
         form_layout.addRow(self.default_check)
         
         layout.addLayout(form_layout)
@@ -455,7 +516,7 @@ class ConfigDialog(QtWidgets.QDialog):
         self.config_list.clear()
         configs = self.config_manager.get_all_configs()
         for config in configs:
-            display = f"{'[默认] ' if config.is_default else ''}{config.name}"
+            display = f"{'[当前使用] ' if config.is_default else ''}{config.name}"
             item = QtWidgets.QListWidgetItem(display)
             item.setData(Qt.UserRole, config)
             self.config_list.addItem(item)
@@ -555,7 +616,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle("PyMOL AI Assistant")
         self.setMinimumSize(600, 400)
-        self.resize(1000, 750)  # 设置初始大小，但允许用户调整
+        self.resize(600, 400)  # 设置初始大小
         
         self.config_manager = get_config_manager()
         self.log_manager = get_log_manager()
@@ -570,6 +631,48 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
     def setup_ui(self):
         """设置界面"""
+        # 设置窗口背景色为深色
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #1e1e1e;
+            }
+            QWidget {
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+            }
+            QTabWidget::pane {
+                border: none;
+                background-color: #1e1e1e;
+            }
+            QTabBar::tab {
+                background-color: #2d2d2d;
+                color: #d4d4d4;
+                padding: 8px 16px;
+                border: none;
+            }
+            QTabBar::tab:selected {
+                background-color: #1e1e1e;
+                border-bottom: 2px solid #0078d4;
+            }
+            QTabBar::tab:hover:!selected {
+                background-color: #3d3d3d;
+            }
+            QLabel {
+                color: #d4d4d4;
+                background-color: transparent;
+            }
+            QPushButton {
+                background-color: #3c3c3c;
+                color: #d4d4d4;
+                border: 1px solid #5c5c5c;
+                padding: 6px 12px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #4c4c4c;
+            }
+        """)
+        
         # 中央部件
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
@@ -609,7 +712,20 @@ class AIChatWindow(QtWidgets.QMainWindow):
         scroll.setStyleSheet("""
             QScrollArea {
                 border: none;
-                background-color: #f5f5f5;
+                background-color: #1e1e1e;
+            }
+            QScrollBar:vertical {
+                background-color: #2d2d2d;
+                width: 12px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #4d4d4d;
+                min-height: 20px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #5d5d5d;
             }
         """)
 
@@ -631,10 +747,14 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.input_text.setMaximumHeight(80)
         self.input_text.setStyleSheet("""
             QTextEdit {
-                border: 1px solid #ddd;
+                border: 1px solid #3e3e3e;
                 border-radius: 8px;
                 padding: 8px;
-                background-color: white;
+                background-color: #2d2d2d;
+                color: #d4d4d4;
+            }
+            QTextEdit::placeholder {
+                color: #808080;
             }
         """)
         self.input_text.installEventFilter(self)
@@ -644,7 +764,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.send_btn.setMinimumHeight(60)
         self.send_btn.setStyleSheet("""
             QPushButton {
-                background-color: #007bff;
+                background-color: #0e639c;
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -652,10 +772,10 @@ class AIChatWindow(QtWidgets.QMainWindow):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #0056b3;
+                background-color: #1177bb;
             }
             QPushButton:disabled {
-                background-color: #6c757d;
+                background-color: #3c3c3c;
             }
         """)
         self.send_btn.clicked.connect(self.send_message)
@@ -667,7 +787,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.stop_btn.setVisible(False)  # 初始隐藏
         self.stop_btn.setStyleSheet("""
             QPushButton {
-                background-color: #dc3545;
+                background-color: #c75450;
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -675,7 +795,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #c82333;
+                background-color: #d87470;
             }
         """)
         self.stop_btn.clicked.connect(self.stop_streaming)
@@ -710,7 +830,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         if config:
             self.current_config = config
             self.config_label.setText(f"API: {config.name}")
-            self.log_manager.info(f"加载默认配置: {config.name}")
+            self.log_manager.info(f"加载当前使用配置: {config.name}")
     
     def open_config_dialog(self):
         """打开配置对话框"""
@@ -760,11 +880,11 @@ class AIChatWindow(QtWidgets.QMainWindow):
             return
 
         if not self.current_config:
-            self.log_manager.error("未配置 API 配置", LogType.SYSTEM)
+            self.log_manager.error("未配置 API 配置", LogType.ERROR)
             QtWidgets.QMessageBox.warning(self, "警告", "请先配置 API")
             return
 
-        self.log_manager.info(f"用户发送消息: {message[:100]}...", LogType.CHAT)
+        self.log_manager.info(f"用户: {message[:100]}...", LogType.CHAT_USER)
 
         # 清空输入
         self.input_text.clear()
@@ -808,7 +928,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
             self.log_manager.debug("AI 流式请求线程完成", LogType.SYSTEM)
         except Exception as e:
             error_detail = f"{str(e)}\n{traceback.format_exc()}"
-            self.log_manager.error(f"AI 流式请求线程异常: {error_detail}", LogType.SYSTEM)
+            self.log_manager.error(f"AI 流式请求线程异常: {error_detail}", LogType.ERROR)
             self._on_stream_error(str(e))
     
     async def _stream_ai_response(self):
@@ -819,13 +939,13 @@ class AIChatWindow(QtWidgets.QMainWindow):
             from openai import AsyncOpenAI
             self.log_manager.debug("成功导入 openai.AsyncOpenAI", LogType.SYSTEM)
         except ImportError as e:
-            self.log_manager.error(f"缺少 openai 包: {e}\n{traceback.format_exc()}", LogType.SYSTEM)
+            self.log_manager.error(f"缺少 openai 包: {e}", LogType.ERROR)
             self._on_stream_error("缺少 openai 包，请安装: pip install openai")
             return
 
         config = self.current_config
         if not config:
-            self.log_manager.error("未配置 API 配置", LogType.SYSTEM)
+            self.log_manager.error("未配置 API 配置", LogType.ERROR)
             self._on_stream_error("未配置 API")
             return
 
@@ -848,19 +968,40 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
             while iteration < max_iterations:
                 iteration += 1
-                self.log_manager.debug(f"工具调用循环 iteration={iteration}/{max_iterations}", LogType.SYSTEM)
 
-                # 准备消息
-                messages = self.chat_history.copy()
-                self.log_manager.debug(f"准备消息: {len(messages)} 条", LogType.SYSTEM)
-
+                # 准备消息 - 使用深拷贝
+                messages = []
+                for i, msg in enumerate(self.chat_history):
+                    # 使用深拷贝确保完全独立
+                    new_msg = copy.deepcopy(msg)
+                    
+                    if new_msg.get("role") == "assistant":
+                        # SiliconFlow API: 如果启用了 thinking 模式，所有 assistant 消息必须有 reasoning_content
+                        if "reasoning_content" not in new_msg or new_msg.get("reasoning_content") is None:
+                            new_msg["reasoning_content"] = ""
+                        
+                        # 如果没有 content 且有 tool_calls，需要添加空 content（SiliconFlow 要求）
+                        if "content" not in new_msg and "tool_calls" in new_msg:
+                            new_msg["content"] = ""
+                    
+                    messages.append(new_msg)
+                
                 # 添加系统提示
                 system_prompt = self._get_system_prompt()
                 messages.insert(0, {"role": "system", "content": system_prompt})
-                self.log_manager.debug("添加系统提示", LogType.SYSTEM)
-
-                # 发送请求
-                self.log_manager.debug(f"发送 API 请求到 {config.api_url}", LogType.SYSTEM)
+                
+                # 简化日志：只显示发送的消息统计
+                assistant_count = sum(1 for m in messages if m.get("role") == "assistant")
+                tool_count = sum(1 for m in messages if m.get("role") == "tool")
+                self.log_manager.info(f"▶ 发送请求: {len(messages)} 条消息 (assistant={assistant_count}, tool={tool_count})", LogType.API)
+                
+                # 调试：打印最后一条 assistant 消息的详细内容（最新生成的）
+                for m in reversed(messages):
+                    if m.get("role") == "assistant" and m.get("tool_calls"):
+                        has_rc = "reasoning_content" in m
+                        rc_val = m.get("reasoning_content", "MISSING")
+                        self.log_manager.debug(f"Assistant tool_call 消息: has_rc={has_rc}, rc='{rc_val[:50] if rc_val else '<empty>'}...', tools={len(m.get('tool_calls', []))}", LogType.API)
+                        break
                 response = await client.chat.completions.create(
                     model=config.model,
                     messages=messages,
@@ -868,10 +1009,11 @@ class AIChatWindow(QtWidgets.QMainWindow):
                     tool_choice="auto",
                     stream=True
                 )
-                self.log_manager.debug("开始接收流式响应", LogType.SYSTEM)
+                self.log_manager.debug("◀ 开始接收流式响应", LogType.API)
 
                 # 处理流式响应
                 full_content = ""
+                full_reasoning = ""  # 捕获 AI 返回的 reasoning_content
                 tool_calls_data = []
 
                 async for chunk in response:
@@ -885,40 +1027,29 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
                     # 处理思考过程（如果模型支持）
                     if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
-                        self._on_stream_content(delta.reasoning_content, is_thinking=True)
+                        reasoning = delta.reasoning_content
+                        full_reasoning += reasoning
+                        self._on_stream_content(reasoning, is_thinking=True)
 
                     # 处理工具调用
                     if delta.tool_calls:
                         for tc in delta.tool_calls:
                             index = tc.index
-                            self.log_manager.debug(f"收到工具调用 delta: index={index}", LogType.TOOL_CALL)
-
+                            
                             # 确保有足够的空间
                             while len(tool_calls_data) <= index:
                                 tool_calls_data.append({"id": "", "name": "", "arguments": ""})
 
                             if tc.id:
                                 tool_calls_data[index]["id"] = tc.id
-                                self.log_manager.debug(f"工具调用 ID: {tc.id}", LogType.TOOL_CALL)
                             if tc.function:
                                 if tc.function.name:
                                     tool_calls_data[index]["name"] = tc.function.name
-                                    self.log_manager.debug(f"工具名称: {tc.function.name}", LogType.TOOL_CALL)
+                                    self.log_manager.info(f"🔧 工具调用: {tc.function.name}", LogType.TOOL_CALL)
                                 if tc.function.arguments:
                                     tool_calls_data[index]["arguments"] += tc.function.arguments
-                                    self.log_manager.debug(f"工具参数片段: {tc.function.arguments}", LogType.TOOL_CALL)
 
-                                    # 尝试解析参数并显示
-                                    try:
-                                        args = json.loads(tool_calls_data[index]["arguments"])
-                                        self._on_tool_call(tool_calls_data[index]["name"], args)
-                                        self.log_manager.debug(f"成功解析工具参数: {tool_calls_data[index]['name']}", LogType.TOOL_CALL)
-                                    except json.JSONDecodeError as e:
-                                        self.log_manager.debug(f"参数未完全接收，等待更多数据: {e}", LogType.TOOL_CALL)
-                                    except Exception as e:
-                                        self.log_manager.error(f"解析工具参数失败: {e}\n{traceback.format_exc()}", LogType.TOOL_CALL)
-
-                self.log_manager.debug(f"流式响应完成: content_length={len(full_content)}, tool_calls={len(tool_calls_data)}", LogType.SYSTEM)
+                self.log_manager.info(f"◀ 响应完成: content={len(full_content)} 字符, reasoning={len(full_reasoning)} 字符, {len(tool_calls_data)} 个工具调用", LogType.API)
 
                 # 处理工具调用
                 tool_calls_for_history = []
@@ -926,23 +1057,26 @@ class AIChatWindow(QtWidgets.QMainWindow):
                 if not tool_calls_data:
                     # 没有工具调用，如果有内容则添加到历史并结束
                     if full_content:
-                        self.chat_history.append({"role": "assistant", "content": full_content, "reasoning_content": ""})
+                        self.chat_history.append({
+                            "role": "assistant",
+                            "content": full_content,
+                            "reasoning_content": full_reasoning
+                        })
                         self.log_manager.chat_assistant(full_content)
                     break
 
-                self.log_manager.debug(f"执行 {len(tool_calls_data)} 个工具调用", LogType.SYSTEM)
+                self.log_manager.info(f"🔧 执行 {len(tool_calls_data)} 个工具调用", LogType.TOOL_EXEC)
 
                 for tool_call in tool_calls_data:
                     if tool_call["name"] and tool_call["arguments"]:
                         tool_name = tool_call["name"]
                         args_str = tool_call["arguments"]
-                        self.log_manager.info(f"准备执行工具: {tool_name}, args_length={len(args_str)}", LogType.TOOL_CALL)
 
                         try:
                             args = json.loads(args_str)
-                            self.log_manager.debug(f"解析工具参数成功: {tool_name}", LogType.TOOL_CALL)
+                            # 显示工具调用（只显示一次）
+                            self._on_tool_call(tool_name, args)
                             result = execute_tool(tool_name, args)
-                            self.log_manager.tool_result(tool_name, result)
                             self._on_tool_result(tool_name, result)
 
                             # 保存工具调用信息到历史
@@ -964,7 +1098,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
                         except json.JSONDecodeError as e:
                             error_msg = f"参数解析失败: {e}"
-                            self.log_manager.error(f"{tool_name} {error_msg}\n参数内容: {args_str}\n{traceback.format_exc()}", LogType.TOOL_CALL)
+                            self.log_manager.error(f"参数错误: {error_msg}", LogType.TOOL_EXEC)
                             error_result = {
                                 "success": False,
                                 "message": error_msg
@@ -985,7 +1119,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
                             })
                         except Exception as e:
                             error_msg = f"执行出错: {e}"
-                            self.log_manager.error(f"{tool_name} {error_msg}\n{traceback.format_exc()}", LogType.TOOL_CALL)
+                            self.log_manager.error(f"执行错误: {error_msg}", LogType.TOOL_EXEC)
                             error_result = {
                                 "success": False,
                                 "message": error_msg
@@ -1009,23 +1143,24 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
                 # 添加 assistant 的工具调用消息到历史（如果有工具调用）
                 if tool_calls_for_history:
+                    # SiliconFlow API: thinking 模式下 assistant 消息必须有 reasoning_content
+                    # 使用 AI 实际返回的 reasoning_content，如果没有则使用空字符串
                     assistant_msg = {
                         "role": "assistant",
-                        "tool_calls": tool_calls_for_history,
-                        "reasoning_content": ""  # SiliconFlow API 要求包含此字段
+                        "reasoning_content": full_reasoning if full_reasoning else "",
+                        "tool_calls": tool_calls_for_history
                     }
-                    # 如果有文本内容，也要包含进去
+                    # content: 有内容就加，没内容就不加（API 要求）
                     if full_content:
                         assistant_msg["content"] = full_content
                     self.chat_history.append(assistant_msg)
-                    self.log_manager.debug(f"添加 {len(tool_calls_for_history)} 个工具调用到历史", LogType.SYSTEM)
 
             self._on_stream_complete()
-            self.log_manager.info("流式响应完全结束", LogType.SYSTEM)
+            self.log_manager.info("✓ 流式响应结束", LogType.API)
 
         except Exception as e:
             error_detail = f"{str(e)}\n{traceback.format_exc()}"
-            self.log_manager.error(f"流式响应异常: {error_detail}", LogType.SYSTEM)
+            self.log_manager.error(f"✗ 流式响应异常: {error_detail}", LogType.ERROR)
             self._on_stream_error(str(e))
     
     def _get_system_prompt(self) -> str:
@@ -1155,7 +1290,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
     def stop_streaming(self):
         """停止流式响应"""
         if self.is_streaming:
-            self.log_manager.info("用户停止流式响应", LogType.SYSTEM)
+            self.log_manager.info("■ 用户停止流式响应", LogType.API)
             self.is_streaming = False
             # 重置 UI 状态
             self.send_btn.setEnabled(True)
@@ -1186,7 +1321,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
     @QtCore.Slot(str)
     def _handle_stream_error(self, error: str):
         """处理流式错误"""
-        self.log_manager.error(f"处理流式错误: {error}\n{traceback.format_exc()}", LogType.SYSTEM)
+        self.log_manager.error(f"✗ 流式错误: {error}", LogType.ERROR)
         self.is_streaming = False
         self.send_btn.setEnabled(True)
         self.send_btn.setText("发送")
@@ -1197,7 +1332,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         if self.current_message_widget:
             self.current_message_widget.add_text(f"错误: {error}", "tool_result")
 
-        self.log_manager.error(f"AI 流式响应错误: {error}")
+        self.log_manager.error(f"AI 流式响应错误: {error}", LogType.ERROR)
         self.scroll_to_bottom()
 
 
