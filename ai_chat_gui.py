@@ -615,7 +615,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PyMOL AI Assistant")
-        self.resize(300, 200)  # 设置初始大小
+        self.resize(500, 400)  # 设置初始大小
         
         self.config_manager = get_config_manager()
         self.log_manager = get_log_manager()
