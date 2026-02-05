@@ -673,6 +673,14 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
             name = arguments.get("name", "")
             if not name:
                 name = code.lower()
+
+            # 检查对象是否已存在
+            existing_objects = cmd.get_names("objects")
+            if name in existing_objects:
+                # 删除已存在的对象
+                cmd.delete(name)
+                print(f"[PyMOL AI Assistant] 删除已存在的对象: {name}")
+
             cmd.fetch(code, name)
             return {
                 "success": True,
