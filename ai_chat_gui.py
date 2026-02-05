@@ -909,6 +909,24 @@ class AIChatWindow(QtWidgets.QMainWindow):
                                 "content": json.dumps(result, ensure_ascii=False)
                             })
 
+                        except json.JSONDecodeError as e:
+                            self._on_tool_result(tool_call["name"], {
+                                "success": False,
+                                "message": f"参数解析失败: {e}"
+                            })
+                            tool_calls_for_history.append({
+                                "id": tool_call["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": tool_call["name"],
+                                    "arguments": tool_call["arguments"]
+                                }
+                            })
+                            self.chat_history.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call["id"],
+                                "content": json.dumps({"success": False, "message": f"参数解析失败: {e}"}, ensure_ascii=False)
+                            })
                         except Exception as e:
                             self._on_tool_result(tool_call["name"], {
                                 "success": False,
@@ -950,23 +968,44 @@ class AIChatWindow(QtWidgets.QMainWindow):
         """获取系统提示"""
         return """你是一个 PyMOL 分子可视化助手。你可以使用工具来控制 PyMOL 软件。
 
-可用工具：
+结构加载与脚本执行：
 - pymol_fetch: 从 PDB 数据库下载结构
 - pymol_load: 加载本地文件
-- pymol_show: 显示表示形式（lines, sticks, spheres, surface, mesh, ribbon, cartoon）
+- pymol_run_script: 执行 Python 脚本（.py/.pym）
+- pymol_run_pml: 执行 PyMOL 脚本（.pml）
+- pymol_do_command: 执行 PyMOL 命令
+
+信息查询（获取详细分子信息）：
+- pymol_get_info: 获取基本信息（原子数、对象、链）
+- pymol_get_selection_details: 获取选择集详细信息（残基列表、原子数、二级结构）- 用于回答"当前选中的是什么氨基酸"
+- pymol_get_atom_info: 获取原子详细信息（坐标、B因子、元素等）
+- pymol_get_residue_info: 获取残基详细信息
+- pymol_get_chain_info: 获取链详细信息（残基范围、原子数）
+- pymol_get_object_info: 获取对象详细信息
+- pymol_get_distance: 计算两个选择之间的距离
+- pymol_get_angle: 计算三个原子之间的角度
+- pymol_get_dihedral: 计算四个原子之间的二面角
+- pymol_find_contacts: 查找原子接触
+
+显示与操作：
+- pymol_show: 显示表示形式（lines, sticks, spheres, surface, mesh, ribbon, cartoon, labels, nonbonded）
 - pymol_hide: 隐藏表示形式
-- pymol_color: 设置颜色（red, green, blue, rainbow, by_element, by_chain 等）
+- pymol_color: 设置颜色（red, green, blue, rainbow, by_element, by_chain, by_ss, by_resi, by_b 等）
 - pymol_bg_color: 设置背景颜色
 - pymol_zoom: 缩放视图
 - pymol_rotate: 旋转视图
 - pymol_select: 创建选择集
 - pymol_label: 添加标签
-- pymol_ray: 光线追踪渲染
-- pymol_png: 保存图像
-- pymol_get_info: 获取分子信息
 - pymol_reset: 重置视图
 - pymol_center: 居中视图
+- pymol_remove: 删除对象或选择集
+- pymol_set: 设置 PyMOL 参数
 
+图像导出：
+- pymol_ray: 光线追踪渲染
+- pymol_png: 保存图像
+
+当用户询问关于当前选择的信息（如"选中的是什么氨基酸"），使用 pymol_get_selection_details 获取详细信息。
 当用户请求涉及 PyMOL 操作时，请使用相应工具。使用工具后，向用户解释你做了什么。
 """
     
