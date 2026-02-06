@@ -87,7 +87,7 @@ API URL: https://api.siliconflow.cn/v1
 Recommended Models:
   - Pro/moonshotai/Kimi-K2.5  # Best overall, paid
   - Pro/zai-org/GLM-4.7       # Paid
-  - deepseek-ai/DeepSeek-V3.2 # Free model
+  - deepseek-ai/DeepSeek-R1 # Free model
 ```
 
 **Registration Bonus**:
