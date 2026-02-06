@@ -12,16 +12,6 @@ As shown in the screenshot, you only need to describe your needs in everyday lan
 
 ---
 
-## 📝 Special Statement
-
-**This project was primarily developed with the assistance of AI models:**
-- **Kimi K2.5** (Moonshot AI) - Core architecture and functionality
-- **GLM-4.7** (Zhipu AI) - Code optimization and feature enhancement
-
-With the help of AI, the developer realized this powerful PyMOL intelligent plugin by describing requirements in natural language.
-
----
-
 ## 🌐 Repositories
 
 This project is maintained simultaneously on GitHub and Gitee:
@@ -52,7 +42,7 @@ This project is maintained simultaneously on GitHub and Gitee:
 
 ## 📥 Installation
 
-### Method 1: Install via Plugin Manager (Recommended)
+### Install via Plugin Manager
 
 1. **Download Plugin**
    - GitHub: [Releases Page](https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest)
@@ -166,14 +156,6 @@ Load and run Python script /path/to/setup.py
 
 ---
 
-## 🔧 System Requirements
-
-- **PyMOL**: 2.0 or higher
-- **Python**: 3.6 or higher
-- **Dependencies**: `openai>=1.0.0`, `aiohttp>=3.8.0` (auto-installed)
-
----
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -189,6 +171,16 @@ Issues and Pull Requests are welcome!
 ## ☕ Support
 
 If this project helps you, please consider giving it a Star ⭐!
+
+---
+
+## 📝 Special Statement
+
+**This project was primarily developed with the assistance of AI models:**
+- **Kimi K2.5** (Moonshot AI) - Core architecture and functionality
+- **GLM-4.7** (Zhipu AI) - Code optimization and feature enhancement
+
+With the help of AI, the developer realized this powerful PyMOL intelligent plugin by describing requirements in natural language.
 
 ---
 

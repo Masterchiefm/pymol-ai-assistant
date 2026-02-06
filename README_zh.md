@@ -12,16 +12,6 @@
 
 ---
 
-## 📝 特别声明
-
-**本项目代码主要由 AI 模型辅助开发：**
-- **Kimi K2.5**（月之暗面）- 核心架构与功能实现
-- **GLM-4.7**（智谱 AI）- 代码优化与功能完善
-
-在 AI 的协助下，开发者通过自然语言描述需求，实现了这一强大的 PyMOL 智能化插件。
-
----
-
 ## 🌐 代码仓库
 
 本项目同时在 GitHub 和 Gitee 同步维护：
@@ -52,7 +42,7 @@
 
 ## 📥 安装方法
 
-### 方式一：通过 Plugin Manager 安装（推荐）
+### 通过 Plugin Manager 安装
 
 1. **下载插件**
    - GitHub: [Releases 页面](https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest)
@@ -166,14 +156,6 @@ API URL: https://api.siliconflow.cn/v1
 
 ---
 
-## 🔧 系统要求
-
-- **PyMOL**: 2.0 或更高版本
-- **Python**: 3.6 或更高版本
-- **依赖包**: `openai>=1.0.0`, `aiohttp>=3.8.0`（自动安装）
-
----
-
 ## 📄 许可证
 
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
@@ -192,4 +174,21 @@ API URL: https://api.siliconflow.cn/v1
 
 ---
 
+## 📝 特别声明
+
+**本项目代码主要由 AI 模型辅助开发：**
+- **Kimi K2.5**（月之暗面）- 核心架构与功能实现
+- **GLM-4.7**（智谱 AI）- 代码优化与功能完善
+
+在 AI 的协助下，开发者通过自然语言描述需求，实现了这一强大的 PyMOL 智能化插件。
+
+---
+
 **Made with ❤️ and AI (Kimi K2.5 & GLM-4.7)**
+
+---
+
+## 🌐 语言
+
+- **简体中文**（当前）
+- [English](README.md)
