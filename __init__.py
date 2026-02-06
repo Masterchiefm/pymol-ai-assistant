@@ -1,99 +1,125 @@
-"""
+# -*- coding: utf-8 -*-
+'''
 PyMOL AI Assistant Plugin
 
-使用 AI 工具技能控制 PyMOL 分子可视化软件。
-功能：
-- 流式显示 AI 思考与输出
-- 记录和切换 API 配置
-- 记录和显示操作日志
-- AI 工具控制 PyMOL
-
-Author: AI Assistant
 Version: 1.4.1
-"""
+Author: Mo Qiqin
+License: MIT
 
-__version__ = "1.4.1"
+Description:
+    An AI-powered assistant plugin for PyMOL that uses tool-calling capabilities
+    to control PyMOL through natural language conversations.
+'''
 
+from __future__ import print_function
 import sys
 import os
-import subprocess
-import importlib
-from pathlib import Path
 
-# 插件根目录
-PLUGIN_DIR = Path(__file__).parent.absolute()
+# 获取插件目录
+PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def ensure_dependencies():
-    """
-    检查并安装必要的依赖包。
-    使用当前运行的 Python 解释器（PyMOL 环境）安装。
-    """
-    required_packages = [
-        ("openai", "openai>=1.0.0"),
-        ("aiohttp", "aiohttp>=3.8.0"),
-    ]
+# 添加插件目录到路径
+if PLUGIN_DIR not in sys.path:
+    sys.path.insert(0, PLUGIN_DIR)
+
+
+def check_and_install_dependencies():
+    """检查并安装依赖"""
+    import subprocess
+    import importlib
+    
+    # 获取当前Python解释器路径
+    python_executable = sys.executable
+    
+    # 必需的依赖
+    required_packages = {
+        'requests': 'requests',
+        'PyQt5': 'PyQt5',
+    }
     
     missing_packages = []
-    for module_name, package_spec in required_packages:
+    
+    for package_name, install_name in required_packages.items():
         try:
-            importlib.import_module(module_name)
+            importlib.import_module(package_name)
         except ImportError:
-            missing_packages.append(package_spec)
+            missing_packages.append(install_name)
     
     if missing_packages:
-        python_executable = sys.executable
-        print(f"[PyMOL AI Assistant] 检测到缺失依赖，正在安装: {missing_packages}")
-        print(f"[PyMOL AI Assistant] 使用 Python: {python_executable}")
-        
+        print("[PyMOL AI Assistant] 正在安装依赖: {}".format(', '.join(missing_packages)))
         try:
-            # 使用 subprocess.run 替代 check_call 以获得更好的错误输出
-            result = subprocess.run(
-                [python_executable, "-m", "pip", "install"] + missing_packages,
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                print("[PyMOL AI Assistant] 依赖安装成功！")
-                # 重新加载模块路径
-                importlib.invalidate_caches()
-            else:
-                print(f"[PyMOL AI Assistant] 依赖安装失败:")
-                print(result.stderr)
-                return False
+            subprocess.check_call([
+                python_executable, '-m', 'pip', 'install',
+                '--user', '--quiet'
+            ] + missing_packages)
+            print("[PyMOL AI Assistant] 依赖安装成功！")
+            # 重新加载以检测新安装的包
+            for package_name in required_packages.keys():
+                try:
+                    if package_name in sys.modules:
+                        importlib.reload(sys.modules[package_name])
+                    else:
+                        importlib.import_module(package_name)
+                except:
+                    pass
         except Exception as e:
-            print(f"[PyMOL AI Assistant] 依赖安装失败: {e}")
-            print("[PyMOL AI Assistant] 请手动运行: pip install " + " ".join(missing_packages))
-            return False
-    
-    return True
+            print("[PyMOL AI Assistant] 依赖安装失败: {}".format(e))
+            print("[PyMOL AI Assistant] 请手动安装: pip install {}".format(' '.join(missing_packages)))
 
-# 启动时检查依赖
-_deps_ok = ensure_dependencies()
+
+# 在导入其他模块前检查依赖
+check_and_install_dependencies()
+
+# 导入插件主模块
+try:
+    from . import main
+    from .main import AIAssistantDialog
+except ImportError as e:
+    print("[PyMOL AI Assistant] 导入失败: {}".format(e))
+    raise
+
+
+# 全局对话框实例
+_dialog_instance = None
+
+
+def show_dialog():
+    """显示AI助手对话框"""
+    global _dialog_instance
+    
+    from pymol.Qt import QtWidgets
+    
+    # 获取PyMOL主窗口作为父窗口
+    app = QtWidgets.QApplication.instance()
+    parent = None
+    
+    # 尝试获取PyMOL主窗口
+    try:
+        from pymol import cmd
+        parent = cmd.get_qtwindow()
+    except:
+        pass
+    
+    # 如果对话框已存在，则显示它
+    if _dialog_instance is not None:
+        try:
+            _dialog_instance.show()
+            _dialog_instance.raise_()
+            _dialog_instance.activateWindow()
+            return
+        except:
+            _dialog_instance = None
+    
+    # 创建新对话框
+    _dialog_instance = AIAssistantDialog(parent)
+    _dialog_instance.show()
+
 
 def __init_plugin__(app=None):
-    """
-    PyMOL 插件初始化入口（新版 PyMOL）
-    """
-    try:
-        # 延迟导入以避免依赖问题
-        from . import ai_chat_gui
-        ai_chat_gui.init_plugin(app)
-        print("[PyMOL AI Assistant] 插件加载成功！")
-    except Exception as e:
-        print(f"[PyMOL AI Assistant] 插件加载失败: {e}")
-        import traceback
-        traceback.print_exc()
-
-# 兼容旧版 PyMOL 的入口
-def __init__(app=None):
-    """
-    PyMOL 插件初始化入口（旧版 PyMOL）
-    """
-    __init_plugin__(app)
-
-# 如果直接运行此文件（测试用）
-if __name__ == "__main__":
-    print("PyMOL AI Assistant Plugin")
-    print(f"Version: {__version__}")
-    print(f"Plugin Dir: {PLUGIN_DIR}")
-    print(f"Dependencies OK: {_deps_ok}")
+    """初始化插件 - PyMOL会调用这个函数"""
+    from pymol.plugins import addmenuitemqt
+    
+    # 添加菜单项
+    addmenuitemqt('AI Assistant / AI助手', show_dialog)
+    
+    print("[PyMOL AI Assistant] 插件已加载。请通过 Plugin > AI Assistant / AI助手 菜单打开。")

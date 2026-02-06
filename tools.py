@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 PyMOL 工具集
 
@@ -9,6 +10,7 @@ import os
 import json
 import traceback
 from typing import Dict, List, Any, Optional, Callable
+from . import logger
 
 
 def get_tool_definitions() -> List[Dict[str, Any]]:
@@ -153,7 +155,7 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
                         "include_atoms": {
                             "type": "boolean",
                             "description": "是否包含每个原子的详细信息（原子名、元素、坐标等）",
-                            "default": "false"
+                            "default": False
                         }
                     },
                     "required": []
@@ -617,17 +619,17 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "pymol_set",
-                "description": "设置 PyMOL 参数。如 ray_shadows, cartoon_cylindrical_helices, bg_gradient 等。",
+                "description": "设置 PyMOL 参数。如 ray_shadows, cartoon_cylindrical_helices, bg_gradient, transparency 等。",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "setting": {
                             "type": "string",
-                            "description": "设置名称，如 'ray_shadows', 'cartoon_cylindrical_helices', 'bg_gradient'"
+                            "description": "设置名称，如 'ray_shadows', 'cartoon_cylindrical_helices', 'bg_gradient', 'transparency'"
                         },
                         "value": {
                             "type": "string",
-                            "description": "设置值，如 'on', 'off', 'on, blue, white', '1', '0'"
+                            "description": "设置值，如 'on', 'off', 'on, blue, white', '1', '0', '0.5'"
                         },
                         "selection": {
                             "type": "string",
@@ -642,32 +644,90 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
     ]
 
 
-def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    执行指定的 PyMOL 工具
+class ToolExecutor:
+    """工具执行器"""
+    
+    def __init__(self):
+        self.cmd = None
+        self._ensure_cmd()
+    
+    def _ensure_cmd(self):
+        """确保cmd模块已加载"""
+        if self.cmd is None:
+            try:
+                from pymol import cmd
+                self.cmd = cmd
+            except ImportError:
+                raise RuntimeError("PyMOL cmd模块不可用")
+    
+    def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        执行指定的 PyMOL 工具
 
-    Args:
-        tool_name: 工具名称
-        arguments: 工具参数
+        Args:
+            tool_name: 工具名称
+            arguments: 工具参数
 
-    Returns:
-        执行结果字典
-    """
-    # 打印调试信息到 PyMOL 控制台（这样更容易看到）
-    print(f"[PyMOL AI Assistant] 执行工具: {tool_name}")
-    print(f"[PyMOL AI Assistant] 参数: {json.dumps(arguments, ensure_ascii=False)}")
+        Returns:
+            执行结果字典
+        """
+        # 打印调试信息到 PyMOL 控制台
+        print(f"[PyMOL AI Assistant] 执行工具: {tool_name}")
+        print(f"[PyMOL AI Assistant] 参数: {json.dumps(arguments, ensure_ascii=False)}")
+        
+        # 记录到日志
+        logger.logger.info(
+            logger.TOOL_CALL,
+            f"执行工具: {tool_name}",
+            {"tool": tool_name, "params": arguments}
+        )
 
-    try:
-        from pymol import cmd
-    except ImportError:
-        error_msg = "无法导入 PyMOL cmd 模块"
-        print(f"[PyMOL AI Assistant] 错误: {error_msg}")
-        return {
-            "success": False,
-            "message": error_msg
-        }
+        try:
+            from pymol import cmd
+        except ImportError:
+            error_msg = "无法导入 PyMOL cmd 模块"
+            print(f"[PyMOL AI Assistant] 错误: {error_msg}")
+            logger.logger.error(logger.ERRORS, error_msg)
+            return {
+                "success": False,
+                "message": error_msg
+            }
 
-    try:
+        try:
+            result = self._execute_tool(cmd, tool_name, arguments)
+            
+            # 记录成功结果
+            logger.logger.info(
+                logger.TOOL_CALL,
+                f"工具执行成功: {tool_name}",
+                {"tool": tool_name, "result": result}
+            )
+            return result
+
+        except Exception as e:
+            error_msg = f"执行出错: {str(e)}"
+            tb = traceback.format_exc()
+            print(f"[PyMOL AI Assistant] 异常: {error_msg}")
+            print(f"[PyMOL AI Assistant] 工具: {tool_name}")
+            print(f"[PyMOL AI Assistant] 参数: {arguments}")
+            print(f"[PyMOL AI Assistant] Traceback:\n{tb}")
+            
+            # 记录错误到日志
+            logger.logger.error(
+                logger.ERRORS,
+                f"工具执行失败: {tool_name} - {error_msg}",
+                {"tool": tool_name, "params": arguments, "traceback": tb}
+            )
+            
+            return {
+                "success": False,
+                "message": error_msg,
+                "error": tb
+            }
+    
+    def _execute_tool(self, cmd, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """实际执行工具的辅助方法"""
+        
         if tool_name == "pymol_fetch":
             code = arguments.get("code", "")
             name = arguments.get("name", "")
@@ -1030,10 +1090,8 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
             selection2 = arguments.get("selection2", "")
 
             try:
-                # 检查是否是对象名（通过检查是否有空格或特殊字符）
-                # 简单判断：如果 selection 不包含空格、括号等，可能是对象名
+                # 检查是否是对象名
                 def is_object_name(s):
-                    # 检查是否在对象列表中
                     objects = cmd.get_names("objects")
                     return s in objects
 
@@ -1293,15 +1351,9 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
                 "message": error_msg
             }
 
-    except Exception as e:
-        error_msg = f"执行出错: {str(e)}"
-        tb = traceback.format_exc()
-        print(f"[PyMOL AI Assistant] 异常: {error_msg}")
-        print(f"[PyMOL AI Assistant] 工具: {tool_name}")
-        print(f"[PyMOL AI Assistant] 参数: {arguments}")
-        print(f"[PyMOL AI Assistant] Traceback:\n{tb}")
-        return {
-            "success": False,
-            "message": error_msg,
-            "error": tb
-        }
+
+# 工具描述导出（兼容旧代码）
+TOOLS = get_tool_definitions()
+
+# 全局工具执行器实例
+tool_executor = ToolExecutor()
