@@ -5,6 +5,8 @@
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
 > **Control PyMOL with natural language. Make molecular visualization simple and efficient.**
+> 
+> [简体中文](README_zh.md) | **English** (Current)
 
 ![Main Interface](fig/1.png)
 
@@ -22,13 +24,6 @@ This project is maintained simultaneously on GitHub and Gitee:
 | **Gitee** | https://gitee.com/MasterChiefm/pymol-ai-assistant | 🇨🇳 China (Recommended) |
 
 > **Tip**: Users in China are recommended to use Gitee for faster and more stable download speeds.
-
----
-
-## 🌐 Languages
-
-- [简体中文](README_zh.md)
-- **English** (Current)
 
 ---
 

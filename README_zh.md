@@ -5,6 +5,8 @@
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
 > **用自然语言控制 PyMOL，让分子可视化变得简单高效。**
+> 
+> **简体中文**（当前）| [English](README.md)
 
 ![主界面](fig/1.png)
 
@@ -22,13 +24,6 @@
 | **Gitee** | https://gitee.com/MasterChiefm/pymol-ai-assistant | 🇨🇳 国内推荐 |
 
 > **提示**：国内用户推荐使用 Gitee，下载速度更快更稳定。
-
----
-
-## 🌐 语言
-
-- **简体中文**（当前）
-- [English](README.md)
 
 ---
 
