@@ -132,7 +132,6 @@ Load PDB 1ake, select each chain and color them, display surface with transparen
 What is the distance between the two residues I selected? Show me the measurement.
 ```
 ![](fig/5.png)
-![](fig/6.png)
 
 ### More Examples
 

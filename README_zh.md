@@ -132,7 +132,6 @@ API URL: https://api.siliconflow.cn/v1
 我选中的两个残基之间的距离是多少？给我标出来。
 ```
 ![](fig/5.png)
-![](fig/6.png)
 
 ### 更多示例
 
