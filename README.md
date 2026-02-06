@@ -25,6 +25,13 @@ This project is maintained simultaneously on GitHub and Gitee:
 
 ---
 
+## 🌐 Languages
+
+- [简体中文](README_zh.md)
+- **English** (Current)
+
+---
+
 ## ✨ Features
 
 | Feature | Description |
@@ -185,10 +192,3 @@ With the help of AI, the developer realized this powerful PyMOL intelligent plug
 ---
 
 **Made with ❤️ and AI (Kimi K2.5 & GLM-4.7)**
-
----
-
-## 🌐 Languages
-
-- [简体中文](README_zh.md)
-- **English** (Current)
