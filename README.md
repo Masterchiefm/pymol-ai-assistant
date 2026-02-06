@@ -1,116 +1,202 @@
-# PyMOL AI Assistant 插件
+# PyMOL AI Assistant Plugin
 
-用人话（自然语言）控制 PyMOL。
-![主界面](fig/1.png)
+[![Version](https://img.shields.io/badge/version-1.4.1-blue.svg)](https://github.com/Masterchiefm/pymol-ai-assistant/releases)
+[![Python](https://img.shields.io/badge/python-3.x-green.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
-从中你可以看到，我只需要跟他说需求，就可以直接操纵pymol了。
+> **Control PyMOL with natural language. Make molecular visualization simple and efficient.**
 
-## 代码仓库
+![Main Interface](fig/1.png)
 
-本项目同时在 GitHub 和 Gitee 同步维护：
+As shown in the screenshot, you only need to describe your needs in everyday language, and the AI will directly control PyMOL to complete complex molecular visualization tasks.
 
-- **GitHub**: https://github.com/Masterchiefm/pymol-ai-assistant
-- **Gitee**: https://gitee.com/MasterChiefm/pymol-ai-assistant
+---
 
-**国内用户推荐使用 Gitee 访问，下载速度更快。**
+## 📝 Special Statement
 
-## 功能特性
+**This project was primarily developed with the assistance of AI models:**
+- **Kimi K2.5** (Moonshot AI) - Core architecture and functionality
+- **GLM-4.7** (Zhipu AI) - Code optimization and feature enhancement
 
-- 🤖 **AI 对话** - 使用自然语言控制 PyMOL
-- 🌊 **流式显示** - 实时显示 AI 思考和输出（合并显示，颜色区分）
-- 🔧 **工具调用** - AI 可直接操作 PyMOL（加载结构、设置样式、保存图像等）
-- ⚙️ **配置管理** - 支持多 API 配置（SiliconFlow、OpenAI 等），可导入导出
-- 📋 **日志系统** - 记录所有对话和工具调用，支持过滤和导出
-- 🌐 **双语切换** - 支持中文/英文界面一键切换，自动记忆语言偏好
-- 📦 **自动依赖** - 安装时自动检查并安装所需依赖
+With the help of AI, the developer realized this powerful PyMOL intelligent plugin by describing requirements in natural language.
 
-## 安装方法
+---
 
-### 通过 Plugin Manager 安装
+## 🌐 Repositories
 
-1. 下载最新版本的压缩包：
-   - 访问 [Releases 页面](https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest) (GitHub)
-   - 或访问 [Releases 页面](https://gitee.com/MasterChiefm/pymol-ai-assistant/releases) (Gitee)
-   - 下载 **pymol-ai-assistant.zip**
+This project is maintained simultaneously on GitHub and Gitee:
 
-![如何安装插件](fig/2.png)
-2. 打开 PyMOL → Plugin → Plugin Manager
-3. 点击 "Install New Plugin"
-4. 选择下载的 zip 文件
-5. 重启 PyMOL
+| Platform | URL | Recommendation |
+|----------|-----|----------------|
+| **GitHub** | https://github.com/Masterchiefm/pymol-ai-assistant | ⭐ International |
+| **Gitee** | https://gitee.com/MasterChiefm/pymol-ai-assistant | 🇨🇳 China (Recommended) |
 
-## 使用方法
+> **Tip**: Users in China are recommended to use Gitee for faster and more stable download speeds.
 
-1. 启动 PyMOL
-2. 菜单栏：Plugin → AI Assistant
-3. 首次使用需要配置 API：
-   - ![](fig/3.png)
-   - 点击 "⚙️ 配置" 按钮（或 "⚙️ Config" 如果是英文界面）
-   - 添加你的 API 配置（API URL、Key、模型）
-   - 支持 SiliconFlow、OpenAI 等兼容 OpenAI API 的服务
+---
 
-4. （可选）点击 "🌐 English" 按钮可切换为英文界面，语言偏好会自动保存
+## ✨ Features
 
-### API 配置示例
+| Feature | Description |
+|---------|-------------|
+| 🤖 **AI Chat** | Control PyMOL with natural language, no need to memorize complex commands |
+| 🌊 **Streaming** | Real-time display of AI thinking process and output with color distinction |
+| 🔧 **Tool Calling** | AI can directly operate PyMOL: load structures, set styles, save images, etc. |
+| ⚙️ **Config Management** | Support multiple API configs (SiliconFlow, OpenAI, etc.), import/export supported |
+| 📋 **Logging** | Record all conversations and tool calls, with filtering and export |
+| 🌐 **Bilingual** | One-click switching between Chinese/English interface, language preference auto-saved |
+| 📜 **Chat History** | View complete chat_history JSON for debugging and analysis |
+| 📦 **Auto Dependencies** | Automatically check and install required dependencies on installation |
 
-#### SiliconFlow 推荐配置（国内用户推荐使用）
+---
 
-- **API URL**: `https://api.siliconflow.cn/v1`
-- **推荐模型**:
-  - `Pro/moonshotai/Kimi-K2.5` （综合最佳，**需充值使用**）
-  - `Pro/zai-org/GLM-4.7` （**需充值使用**）
-  - `deepseek-ai/DeepSeek-V3.2` （免费模型）
+## 📥 Installation
 
-**注册指南**：
-- 使用邀请链接注册可获得 16 元代金券：https://cloud.siliconflow.cn/i/Su2ao83G
-- 也可以直接访问 Kimi 官网购买包月计划
+### Method 1: Install via Plugin Manager (Recommended)
 
-4. 配置完成后，在输入框中输入指令，按 Enter 发送
+1. **Download Plugin**
+   - GitHub: [Releases Page](https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest)
+   - Gitee: [Releases Page](https://gitee.com/MasterChiefm/pymol-ai-assistant/releases)
+   - Download `pymol-ai-assistant.zip`
 
-## 界面说明
+2. **Installation Steps**
+   
+   ![How to Install](fig/2.png)
+   
+   - Open PyMOL → Plugin → Plugin Manager
+   - Click "Install New Plugin"
+   - Select the downloaded zip file
+   - Restart PyMOL
 
-- **左侧**：聊天区域
-  - 👤 **用户消息**：蓝色背景，右侧显示
-  - 🤖 **AI 消息**：绿色背景，左侧显示
-    - 💭 **思考过程**：灰色斜体显示
-    - **正式输出**：正常黑色文本
-    - ⚙️ **工具调用**：橙色显示
-    - ✓ **工具结果**：绿色/红色显示
-  
-- **右侧**：工具调用和日志面板
-  - 🔧 **工具调用**：显示所有工具调用和结果
-  - 📋 **日志**：系统日志和过滤功能
+---
 
-## 示例指令
+## 🚀 Usage
 
+### Quick Start
+
+1. Launch PyMOL
+2. Menu bar: Plugin → AI Assistant
+3. Configure API for first-time use:
+   
+   ![](fig/3.png)
+   
+   - Click "⚙️ Config" button (or "⚙️ 配置" in Chinese interface)
+   - Add API configuration (URL, Key, Model)
+   - Supports SiliconFlow, OpenAI, and other OpenAI API-compatible services
+
+4. (Optional) Click "🌐 中文" to switch to Chinese interface. Language preference is automatically saved.
+
+### API Configuration Example
+
+#### SiliconFlow (Recommended for China users)
+
+```yaml
+API URL: https://api.siliconflow.cn/v1
+Recommended Models:
+  - Pro/moonshotai/Kimi-K2.5  # Best overall, paid
+  - Pro/zai-org/GLM-4.7       # Paid
+  - deepseek-ai/DeepSeek-V3.2 # Free model
 ```
-加载 PDB 1ake,选出各个链，上色。半透明显示surface
+
+**Registration Bonus**:
+- Get 16 CNY voucher with invite link: https://cloud.siliconflow.cn/i/Su2ao83G
+- Or visit Kimi official website for monthly plans
+
+After configuration, type commands in the input box and press **Enter** to send.
+
+---
+
+## 🖥️ Interface Guide
+
+### Tab Layout
+
+| Tab | Content |
+|-----|---------|
+| 💬 **Chat** | Chat interaction interface |
+| 📋 **Logs** | System logs and debug information |
+| 📜 **History** | View complete chat_history JSON |
+
+### Message Styles
+
+- 👤 **User Message**: Blue background, displayed on right
+- 🤖 **AI Message**: Green background, displayed on left
+  - 💭 **Thinking Process**: Gray italic
+  - **Formal Output**: Normal text
+  - ⚙️ **Tool Call**: Orange display
+  - ✓ **Tool Result**: Green/Red status
+
+---
+
+## 💡 Example Commands
+
+### Example 1: Load and Visualize Molecule
+```
+Load PDB 1ake, select each chain and color them, display surface with transparency
 ```
 ![](fig/4.png)
 
-
+### Example 2: Measure Distance
 ```
-我选中的两个东西之间的距离是多少？给我标出来。
+What is the distance between the two residues I selected? Show me the measurement.
 ```
 ![](fig/5.png)
 ![](fig/6.png)
 
+### More Examples
+
 ```
-旋转视图 90 度，然后保存为图片
+Rotate view 90 degrees, then save as image
 ```
 
 ```
-创建一个选择集，选中 chain A 的所有原子
+Create a selection of all atoms in chain A
 ```
 
 ```
-执行 PyMOL 脚本 /path/to/script.pml
+Execute PyMOL script /path/to/script.pml
 ```
 
 ```
-运行命令：load 1ake; show cartoon; color chain
+Run command: load 1ake; show cartoon; color chain
 ```
 
 ```
-加载并运行 Python 脚本 /path/to/setup.py
+Load and run Python script /path/to/setup.py
 ```
+
+---
+
+## 🔧 System Requirements
+
+- **PyMOL**: 2.0 or higher
+- **Python**: 3.6 or higher
+- **Dependencies**: `openai>=1.0.0`, `aiohttp>=3.8.0` (auto-installed)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🤝 Contributing
+
+Issues and Pull Requests are welcome!
+
+---
+
+## ☕ Support
+
+If this project helps you, please consider giving it a Star ⭐!
+
+---
+
+**Made with ❤️ and AI (Kimi K2.5 & GLM-4.7)**
+
+---
+
+## 🌐 Languages
+
+- [简体中文](README_zh.md)
+- **English** (Current)

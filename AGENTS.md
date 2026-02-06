@@ -334,6 +334,8 @@ elif tool_name == "pymol_new_tool":
 
 ### v1.4.1
 - Added "History" tab to display chat_history JSON for debugging
+- Restructured documentation: README.md (English) + README_zh.md (Chinese)
+- Added AI model attribution (Kimi K2.5 & GLM-4.7) to README files
 
 ### v1.4.0
 - Added bilingual support (Chinese/English) with language switch button
