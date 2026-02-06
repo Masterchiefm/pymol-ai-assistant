@@ -332,11 +332,13 @@ elif tool_name == "pymol_new_tool":
 
 ## Version History
 
+### v1.4.1
+- Added "History" tab to display chat_history JSON for debugging
+
 ### v1.4.0
 - Added bilingual support (Chinese/English) with language switch button
 - Language preference is persisted across restarts
 - All UI elements support dynamic language switching
-- Added "History" tab to display chat_history JSON for debugging
 
 ### v1.2.0
 - Added geometry tools (distance, angle, dihedral)
