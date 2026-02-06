@@ -1425,7 +1425,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
 - pymol_load: 加载本地文件
 - pymol_run_script: 执行 Python 脚本（.py/.pym）
 - pymol_run_pml: 执行 PyMOL 脚本（.pml）
-- pymol_do_command: 执行 PyMOL 命令
+- pymol_do_command: 执行 PyMOL 命令（注意：如需获取信息请使用专门的信息查询工具，不要使用 print，因为 print 的输出只能显示在 PyMOL 界面上而无法返回给你）
 
 信息查询（获取详细分子信息）：
 - pymol_get_info: 获取基本信息（原子数、对象、链）
