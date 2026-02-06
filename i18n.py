@@ -99,6 +99,10 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "zh": "📋 日志",
         "en": "📋 Logs"
     },
+    "tab_history": {
+        "zh": "📜 对话历史",
+        "en": "📜 History"
+    },
     
     # ========== 日志面板 ==========
     "log_filter_label": {

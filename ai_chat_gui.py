@@ -228,6 +228,116 @@ class ChatMessageWidget(QtWidgets.QFrame):
         text_edit.ensureCursorVisible()
 
 
+class HistoryPanel(QtWidgets.QWidget):
+    """对话历史面板 - 显示 chat_history 的 JSON 内容"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.i18n = get_i18n_manager()
+        self.setup_ui()
+        
+        # 注册语言变更回调
+        self.i18n.add_callback(self._on_language_changed)
+    
+    def setup_ui(self):
+        """设置界面"""
+        layout = QtWidgets.QVBoxLayout(self)
+        
+        # 工具栏
+        toolbar = QtWidgets.QHBoxLayout()
+        
+        self.refresh_btn = QtWidgets.QPushButton("🔄 " + self.get_refresh_text())
+        self.refresh_btn.clicked.connect(self.refresh_display)
+        toolbar.addWidget(self.refresh_btn)
+        
+        toolbar.addStretch()
+        
+        self.copy_btn = QtWidgets.QPushButton("📋 " + self.get_copy_text())
+        self.copy_btn.clicked.connect(self.copy_to_clipboard)
+        toolbar.addWidget(self.copy_btn)
+        
+        layout.addLayout(toolbar)
+        
+        # 文本显示区域
+        self.history_text = QtWidgets.QTextEdit()
+        self.history_text.setReadOnly(True)
+        self.history_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                font-family: Consolas, Monaco, monospace;
+                font-size: 11px;
+            }
+        """)
+        self.history_text.setLineWrapMode(QtWidgets.QTextEdit.NoWrap)
+        layout.addWidget(self.history_text)
+        
+        # 状态标签
+        self.status_label = QtWidgets.QLabel(self.get_empty_text())
+        self.status_label.setStyleSheet("color: #808080; font-size: 11px;")
+        layout.addWidget(self.status_label)
+    
+    def get_refresh_text(self) -> str:
+        return "刷新" if self.i18n.get_language_code() == "zh" else "Refresh"
+    
+    def get_copy_text(self) -> str:
+        return "复制" if self.i18n.get_language_code() == "zh" else "Copy"
+    
+    def get_empty_text(self) -> str:
+        return "暂无对话历史" if self.i18n.get_language_code() == "zh" else "No conversation history"
+    
+    def get_copied_text(self) -> str:
+        return "已复制到剪贴板" if self.i18n.get_language_code() == "zh" else "Copied to clipboard"
+    
+    def update_history(self, chat_history: list):
+        """更新历史显示"""
+        if not chat_history:
+            self.history_text.setPlainText("")
+            self.status_label.setText(self.get_empty_text())
+            return
+        
+        # 格式化显示 JSON
+        try:
+            json_str = json.dumps(chat_history, ensure_ascii=False, indent=2)
+            self.history_text.setPlainText(json_str)
+            msg_count = len(chat_history)
+            self.status_label.setText(f"共 {msg_count} 条消息" if self.i18n.get_language_code() == "zh" else f"{msg_count} messages")
+        except Exception as e:
+            self.history_text.setPlainText(f"Error: {e}")
+    
+    def refresh_display(self):
+        """刷新显示 - 由外部调用"""
+        pass  # 实际刷新由 update_history 处理
+    
+    def copy_to_clipboard(self):
+        """复制到剪贴板"""
+        text = self.history_text.toPlainText()
+        if text:
+            clipboard = QtWidgets.QApplication.clipboard()
+            clipboard.setText(text)
+            self.status_label.setText(self.get_copied_text())
+            QtCore.QTimer.singleShot(2000, lambda: self.update_status_label())
+    
+    def update_status_label(self):
+        """恢复状态标签"""
+        msg_count = self.history_text.toPlainText().count('"role"')
+        if msg_count == 0:
+            self.status_label.setText(self.get_empty_text())
+        else:
+            self.status_label.setText(f"共 {msg_count} 条消息" if self.i18n.get_language_code() == "zh" else f"{msg_count} messages")
+    
+    def _on_language_changed(self, language):
+        """语言变更回调"""
+        self.refresh_btn.setText("🔄 " + self.get_refresh_text())
+        self.copy_btn.setText("📋 " + self.get_copy_text())
+        self.update_status_label()
+    
+    def closeEvent(self, event):
+        """关闭时取消回调注册"""
+        self.i18n.remove_callback(self._on_language_changed)
+        event.accept()
+
+
 class LogPanel(QtWidgets.QWidget):
     """日志面板"""
     
@@ -874,6 +984,10 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.log_panel = LogPanel()
         self.main_tabs = main_tabs
         main_tabs.addTab(self.log_panel, self.i18n.t("tab_logs"))
+        
+        # === 标签3: 对话历史 ===
+        self.history_panel = HistoryPanel()
+        main_tabs.addTab(self.history_panel, self.i18n.t("tab_history"))
 
         main_layout.addWidget(main_tabs)
         
@@ -905,6 +1019,18 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.config_manager.set_language(self.i18n.get_language_code())
         self.log_manager.info(f"Language switched to: {new_lang.value}")
     
+    def _update_history_panel(self):
+        """更新历史面板（线程安全）"""
+        QtCore.QMetaObject.invokeMethod(
+            self, "_do_update_history_panel",
+            QtCore.Qt.QueuedConnection
+        )
+    
+    @QtCore.Slot()
+    def _do_update_history_panel(self):
+        """实际更新历史面板"""
+        self.history_panel.update_history(self.chat_history)
+
     def _on_language_changed(self, language):
         """语言变更回调 - 更新所有 UI 文本"""
         # 更新窗口标题
@@ -935,6 +1061,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         # 更新标签页标题
         self.main_tabs.setTabText(0, self.i18n.t("tab_chat"))
         self.main_tabs.setTabText(1, self.i18n.t("tab_logs"))
+        self.main_tabs.setTabText(2, self.i18n.t("tab_history"))
         
         # 更新菜单
         self.help_menu.setTitle(self.i18n.t("menu_help"))
@@ -969,6 +1096,9 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.chat_history.clear()
         self.current_message_widget = None
         self.log_manager.info(self.i18n.t("chat_cleared"))
+        
+        # 更新历史面板
+        self.history_panel.update_history(self.chat_history)
     
     def add_message_widget(self, role: str) -> ChatMessageWidget:
         """添加新的消息部件"""
@@ -1018,6 +1148,9 @@ class AIChatWindow(QtWidgets.QMainWindow):
         # 添加到历史
         self.chat_history.append({"role": "user", "content": message})
         self.log_manager.debug(f"当前对话历史长度: {len(self.chat_history)}", LogType.SYSTEM)
+        
+        # 更新历史面板
+        self.history_panel.update_history(self.chat_history)
 
         # 开始流式响应
         self.start_streaming_response()
@@ -1429,6 +1562,9 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.send_btn.setVisible(True)  # 显示发送按钮
         self.stop_btn.setVisible(False)  # 隐藏停止按钮
         self.status_bar.showMessage(self.i18n.t("status_ready"))
+        
+        # 更新历史面板
+        self.history_panel.update_history(self.chat_history)
     
     def _on_stream_error(self, error: str):
         """流错误回调（线程安全）"""
