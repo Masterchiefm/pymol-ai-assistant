@@ -87,7 +87,7 @@ API URL: https://api.siliconflow.cn/v1
 推荐模型:
   - Pro/moonshotai/Kimi-K2.5  # 综合最佳，需充值
   - Pro/zai-org/GLM-4.7       # 需充值
-  - deepseek-ai/DeepSeek-V3.2 # 免费模型
+  - deepseek-ai/DeepSeek-R1 # 免费模型
 ```
 
 **注册优惠**：
