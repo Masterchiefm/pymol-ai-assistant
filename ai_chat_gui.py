@@ -24,6 +24,7 @@ from pymol.Qt import QtWidgets, QtCore, QtGui
 from .config_manager import get_config_manager, APIConfig
 from .log_manager import get_log_manager, LogEntry, LogType, LogLevel
 from .pymol_tools import get_tool_definitions, execute_tool
+from .i18n import get_i18n_manager, t
 
 Qt = QtCore.Qt
 
@@ -36,6 +37,7 @@ class ChatMessageWidget(QtWidgets.QFrame):
         self.role = role
         self._current_text_widget: Optional[QtWidgets.QTextEdit] = None
         self._current_style = None
+        self.i18n = get_i18n_manager()
         self.setup_ui()
     
     def setup_ui(self):
@@ -52,13 +54,13 @@ class ChatMessageWidget(QtWidgets.QFrame):
         header_layout.setContentsMargins(0, 0, 0, 0)
         
         if self.role == "user":
-            role_text = "👤 你"
+            role_text = self.i18n.t("role_user")
             role_color = "#569cd6"  # PyMOL 蓝色
         elif self.role == "assistant":
-            role_text = "🤖 AI"
+            role_text = self.i18n.t("role_assistant")
             role_color = "#4ec9b0"  # PyMOL 青色
         elif self.role == "tool":
-            role_text = "🔧 工具"
+            role_text = self.i18n.t("role_tool")
             role_color = "#dcdcaa"  # PyMOL 黄色
         else:
             role_text = ""
@@ -232,10 +234,14 @@ class LogPanel(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.log_manager = get_log_manager()
+        self.i18n = get_i18n_manager()
         self.setup_ui()
         
         # 注册日志回调
         self.log_manager.add_callback(self.on_new_log)
+        
+        # 注册语言变更回调
+        self.i18n.add_callback(self._on_language_changed)
     
     def setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
@@ -244,18 +250,24 @@ class LogPanel(QtWidgets.QWidget):
         toolbar = QtWidgets.QHBoxLayout()
         
         self.filter_combo = QtWidgets.QComboBox()
-        self.filter_combo.addItems(["全部", "系统", "API", "对话", "AI回复", "工具调用", "工具执行", "工具结果", "思考", "错误"])
+        self._filter_keys = [
+            "log_filter_all", "log_filter_system", "log_filter_api",
+            "log_filter_chat", "log_filter_assistant", "log_filter_tool_call",
+            "log_filter_tool_exec", "log_filter_tool_result", "log_filter_thinking", "log_filter_error"
+        ]
+        self.filter_combo.addItems([self.i18n.t(k) for k in self._filter_keys])
         self.filter_combo.currentTextChanged.connect(self.apply_filter)
-        toolbar.addWidget(QtWidgets.QLabel("过滤:"))
+        self.filter_label = QtWidgets.QLabel(self.i18n.t("log_filter_label"))
+        toolbar.addWidget(self.filter_label)
         toolbar.addWidget(self.filter_combo)
         
         toolbar.addStretch()
         
-        self.clear_btn = QtWidgets.QPushButton("清空")
+        self.clear_btn = QtWidgets.QPushButton(self.i18n.t("log_clear"))
         self.clear_btn.clicked.connect(self.clear_logs)
         toolbar.addWidget(self.clear_btn)
         
-        self.export_btn = QtWidgets.QPushButton("导出")
+        self.export_btn = QtWidgets.QPushButton(self.i18n.t("log_export"))
         self.export_btn.clicked.connect(self.export_logs)
         toolbar.addWidget(self.export_btn)
         
@@ -301,18 +313,22 @@ class LogPanel(QtWidgets.QWidget):
         """判断是否应该显示该日志条目"""
         filter_text = self.filter_combo.currentText()
         
-        type_map = {
-            "全部": None,
-            "系统": LogType.SYSTEM,
-            "API": LogType.API,
-            "对话": LogType.CHAT_USER,
-            "AI回复": LogType.CHAT_ASSISTANT,
-            "工具调用": LogType.TOOL_CALL,
-            "工具执行": LogType.TOOL_EXEC,
-            "工具结果": LogType.TOOL_RESULT,
-            "思考": LogType.THINKING,
-            "错误": LogType.ERROR
-        }
+        # 获取当前显示的过滤器索引
+        filter_index = self.filter_combo.currentIndex()
+        filter_key = self._filter_keys[filter_index] if 0 <= filter_index < len(self._filter_keys) else "log_filter_all"
+        
+        type_map_keys = [
+            "log_filter_all", "log_filter_system", "log_filter_api",
+            "log_filter_chat", "log_filter_assistant", "log_filter_tool_call",
+            "log_filter_tool_exec", "log_filter_tool_result", "log_filter_thinking", "log_filter_error"
+        ]
+        type_map_values = [
+            None, LogType.SYSTEM, LogType.API, LogType.CHAT_USER,
+            LogType.CHAT_ASSISTANT, LogType.TOOL_CALL, LogType.TOOL_EXEC,
+            LogType.TOOL_RESULT, LogType.THINKING, LogType.ERROR
+        ]
+        
+        type_map = {self.i18n.t(k): v for k, v in zip(type_map_keys, type_map_values)}
         
         target_type = type_map.get(filter_text)
         if target_type is None:
@@ -362,20 +378,38 @@ class LogPanel(QtWidgets.QWidget):
     def export_logs(self):
         """导出日志"""
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "导出日志", "pymol_ai_logs.txt", "Text Files (*.txt);;All Files (*)"
+            self, self.i18n.t("log_export_title"), "pymol_ai_logs.txt", "Text Files (*.txt);;All Files (*)"
         )
         if filename:
             try:
                 with open(filename, "w", encoding="utf-8") as f:
                     for entry in self.log_manager.get_all_entries():
                         f.write(entry.format_display() + "\n")
-                QtWidgets.QMessageBox.information(self, "成功", "日志已导出")
+                QtWidgets.QMessageBox.information(self, self.i18n.t("config_success_title"), self.i18n.t("log_export_success"))
             except Exception as e:
-                QtWidgets.QMessageBox.critical(self, "错误", f"导出失败: {e}")
+                QtWidgets.QMessageBox.critical(self, self.i18n.t("config_error_title"), f"{self.i18n.t('log_export_fail')}: {e}")
+    
+    def _on_language_changed(self, language):
+        """语言变更回调"""
+        # 更新过滤器标签
+        self.filter_label.setText(self.i18n.t("log_filter_label"))
+        # 更新过滤器选项
+        current_filter = self.filter_combo.currentText()
+        self.filter_combo.clear()
+        self.filter_combo.addItems([self.i18n.t(k) for k in self._filter_keys])
+        # 尝试恢复之前的过滤器选择
+        for i, key in enumerate(self._filter_keys):
+            if self.i18n.t(key) == current_filter:
+                self.filter_combo.setCurrentIndex(i)
+                break
+        # 更新按钮
+        self.clear_btn.setText(self.i18n.t("log_clear"))
+        self.export_btn.setText(self.i18n.t("log_export"))
     
     def closeEvent(self, event):
         """关闭时取消回调注册"""
         self.log_manager.remove_callback(self.on_new_log)
+        self.i18n.remove_callback(self._on_language_changed)
         event.accept()
 
 
@@ -385,11 +419,12 @@ class ConfigDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.config_manager = get_config_manager()
+        self.i18n = get_i18n_manager()
         self.setup_ui()
         self.load_configs()
     
     def setup_ui(self):
-        self.setWindowTitle("API 配置管理")
+        self.setWindowTitle(self.i18n.t("config_title"))
         self.setMinimumWidth(500)
         self.setMinimumHeight(400)
         
@@ -451,30 +486,35 @@ class ConfigDialog(QtWidgets.QDialog):
         # 配置列表
         self.config_list = QtWidgets.QListWidget()
         self.config_list.currentItemChanged.connect(self.on_config_selected)
-        layout.addWidget(QtWidgets.QLabel("已保存的配置:"))
+        self.config_list_label = QtWidgets.QLabel(self.i18n.t("config_list_label"))
+        layout.addWidget(self.config_list_label)
         layout.addWidget(self.config_list)
         
         # 配置详情表单
         form_layout = QtWidgets.QFormLayout()
         
         self.name_input = QtWidgets.QLineEdit()
-        self.name_input.setPlaceholderText("配置名称（如 SiliconFlow）")
-        form_layout.addRow("名称:", self.name_input)
+        self.name_input.setPlaceholderText(self.i18n.t("config_name_placeholder"))
+        self.form_name_label = self.i18n.t("config_name")
+        form_layout.addRow(self.form_name_label, self.name_input)
         
         self.url_input = QtWidgets.QLineEdit()
-        self.url_input.setPlaceholderText("https://api.example.com/v1")
-        form_layout.addRow("API URL:", self.url_input)
+        self.url_input.setPlaceholderText(self.i18n.t("config_url_placeholder"))
+        self.form_url_label = self.i18n.t("config_url")
+        form_layout.addRow(self.form_url_label, self.url_input)
         
         self.key_input = QtWidgets.QLineEdit()
         self.key_input.setEchoMode(QtWidgets.QLineEdit.Password)
-        self.key_input.setPlaceholderText("sk-...")
-        form_layout.addRow("API Key:", self.key_input)
+        self.key_input.setPlaceholderText(self.i18n.t("config_key_placeholder"))
+        self.form_key_label = self.i18n.t("config_key")
+        form_layout.addRow(self.form_key_label, self.key_input)
         
         self.model_input = QtWidgets.QLineEdit()
-        self.model_input.setPlaceholderText("模型名称（如 gpt-4o）")
-        form_layout.addRow("模型:", self.model_input)
+        self.model_input.setPlaceholderText(self.i18n.t("config_model_placeholder"))
+        self.form_model_label = self.i18n.t("config_model")
+        form_layout.addRow(self.form_model_label, self.model_input)
         
-        self.default_check = QtWidgets.QCheckBox("设为当前使用配置")
+        self.default_check = QtWidgets.QCheckBox(self.i18n.t("config_default"))
         form_layout.addRow(self.default_check)
         
         layout.addLayout(form_layout)
@@ -482,32 +522,32 @@ class ConfigDialog(QtWidgets.QDialog):
         # 按钮
         btn_layout = QtWidgets.QHBoxLayout()
         
-        self.new_btn = QtWidgets.QPushButton("新建")
+        self.new_btn = QtWidgets.QPushButton(self.i18n.t("config_btn_new"))
         self.new_btn.clicked.connect(self.new_config)
         btn_layout.addWidget(self.new_btn)
         
-        self.save_btn = QtWidgets.QPushButton("保存")
+        self.save_btn = QtWidgets.QPushButton(self.i18n.t("config_btn_save"))
         self.save_btn.clicked.connect(self.save_config)
         btn_layout.addWidget(self.save_btn)
         
-        self.delete_btn = QtWidgets.QPushButton("删除")
+        self.delete_btn = QtWidgets.QPushButton(self.i18n.t("config_btn_delete"))
         self.delete_btn.clicked.connect(self.delete_config)
         btn_layout.addWidget(self.delete_btn)
         
         btn_layout.addStretch()
         
-        self.import_btn = QtWidgets.QPushButton("导入")
+        self.import_btn = QtWidgets.QPushButton(self.i18n.t("config_btn_import"))
         self.import_btn.clicked.connect(self.import_config)
         btn_layout.addWidget(self.import_btn)
         
-        self.export_btn = QtWidgets.QPushButton("导出")
+        self.export_btn = QtWidgets.QPushButton(self.i18n.t("config_btn_export"))
         self.export_btn.clicked.connect(self.export_config)
         btn_layout.addWidget(self.export_btn)
         
         layout.addLayout(btn_layout)
         
         # 关闭按钮
-        self.close_btn = QtWidgets.QPushButton("关闭")
+        self.close_btn = QtWidgets.QPushButton(self.i18n.t("config_btn_close"))
         self.close_btn.clicked.connect(self.accept)
         layout.addWidget(self.close_btn)
     
@@ -516,7 +556,7 @@ class ConfigDialog(QtWidgets.QDialog):
         self.config_list.clear()
         configs = self.config_manager.get_all_configs()
         for config in configs:
-            display = f"{'[当前使用] ' if config.is_default else ''}{config.name}"
+            display = f"{self.i18n.t('config_current') if config.is_default else ''}{config.name}"
             item = QtWidgets.QListWidgetItem(display)
             item.setData(Qt.UserRole, config)
             self.config_list.addItem(item)
@@ -544,7 +584,7 @@ class ConfigDialog(QtWidgets.QDialog):
         """保存配置"""
         name = self.name_input.text().strip()
         if not name:
-            QtWidgets.QMessageBox.warning(self, "警告", "请输入配置名称")
+            QtWidgets.QMessageBox.warning(self, self.i18n.t("config_warning_title"), self.i18n.t("config_warning_name"))
             return
         
         config = APIConfig(
@@ -556,42 +596,42 @@ class ConfigDialog(QtWidgets.QDialog):
         )
         
         if self.config_manager.add_config(config):
-            QtWidgets.QMessageBox.information(self, "成功", "配置已保存")
+            QtWidgets.QMessageBox.information(self, self.i18n.t("config_success_title"), self.i18n.t("config_save_success"))
             self.load_configs()
         else:
-            QtWidgets.QMessageBox.critical(self, "错误", "保存配置失败")
+            QtWidgets.QMessageBox.critical(self, self.i18n.t("config_error_title"), self.i18n.t("config_save_fail"))
     
     def delete_config(self):
         """删除配置"""
         current = self.config_list.currentItem()
         if not current:
-            QtWidgets.QMessageBox.warning(self, "警告", "请先选择要删除的配置")
+            QtWidgets.QMessageBox.warning(self, self.i18n.t("config_warning_title"), self.i18n.t("config_warning_select"))
             return
         
         config = current.data(Qt.UserRole)
         reply = QtWidgets.QMessageBox.question(
-            self, "确认", f"确定要删除配置 '{config.name}' 吗？"
+            self, self.i18n.t("config_confirm_title"), self.i18n.t("config_confirm_delete", config.name)
         )
         
         if reply == QtWidgets.QMessageBox.Yes:
             if self.config_manager.remove_config(config.name):
-                QtWidgets.QMessageBox.information(self, "成功", "配置已删除")
+                QtWidgets.QMessageBox.information(self, self.i18n.t("config_success_title"), self.i18n.t("config_delete_success"))
                 self.load_configs()
                 self.new_config()
             else:
-                QtWidgets.QMessageBox.critical(self, "错误", "删除配置失败")
+                QtWidgets.QMessageBox.critical(self, self.i18n.t("config_error_title"), self.i18n.t("config_delete_fail"))
     
     def import_config(self):
         """导入配置"""
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "导入配置", "", "JSON Files (*.json);;All Files (*)"
+            self, self.i18n.t("config_import_title"), "", "JSON Files (*.json);;All Files (*)"
         )
         if filename:
             if self.config_manager.import_config(filename):
-                QtWidgets.QMessageBox.information(self, "成功", "配置已导入")
+                QtWidgets.QMessageBox.information(self, self.i18n.t("config_success_title"), self.i18n.t("config_import_success"))
                 self.load_configs()
             else:
-                QtWidgets.QMessageBox.critical(self, "错误", "导入配置失败")
+                QtWidgets.QMessageBox.critical(self, self.i18n.t("config_error_title"), self.i18n.t("config_import_fail"))
     
     def export_config(self):
         """导出配置"""
@@ -600,9 +640,9 @@ class ConfigDialog(QtWidgets.QDialog):
         )
         if filename:
             if self.config_manager.export_config(filename):
-                QtWidgets.QMessageBox.information(self, "成功", "配置已导出")
+                QtWidgets.QMessageBox.information(self, self.i18n.t("config_success_title"), self.i18n.t("config_export_success"))
             else:
-                QtWidgets.QMessageBox.critical(self, "错误", "导出配置失败")
+                QtWidgets.QMessageBox.critical(self, self.i18n.t("config_error_title"), self.i18n.t("config_export_fail"))
 
 
 class AIChatWindow(QtWidgets.QMainWindow):
@@ -614,11 +654,16 @@ class AIChatWindow(QtWidgets.QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PyMOL AI Assistant")
+        self.i18n = get_i18n_manager()
+        self.setWindowTitle(self.i18n.t("app_title"))
         self.resize(500, 400)  # 设置初始大小
         
         self.config_manager = get_config_manager()
         self.log_manager = get_log_manager()
+        
+        # 加载保存的语言设置
+        saved_lang = self.config_manager.get_language()
+        self.i18n.set_language(saved_lang)
         
         self.current_config: Optional[APIConfig] = None
         self.chat_history: List[Dict[str, Any]] = []
@@ -627,6 +672,9 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
         self.setup_ui()
         self.load_default_config()
+        
+        # 注册语言变更回调
+        self.i18n.add_callback(self._on_language_changed)
 
     def setup_ui(self):
         """设置界面"""
@@ -689,16 +737,22 @@ class AIChatWindow(QtWidgets.QMainWindow):
         # 工具栏
         toolbar = QtWidgets.QHBoxLayout()
 
-        self.config_label = QtWidgets.QLabel("API: 未配置")
+        self.config_label = QtWidgets.QLabel(self.i18n.t("api_not_configured"))
         toolbar.addWidget(self.config_label)
 
         toolbar.addStretch()
 
-        self.config_btn = QtWidgets.QPushButton("⚙️ 配置")
+        # 语言切换按钮
+        self.lang_btn = QtWidgets.QPushButton(self.i18n.t("btn_language"))
+        self.lang_btn.setToolTip("Switch Language / 切换语言")
+        self.lang_btn.clicked.connect(self.toggle_language)
+        toolbar.addWidget(self.lang_btn)
+
+        self.config_btn = QtWidgets.QPushButton(self.i18n.t("btn_config"))
         self.config_btn.clicked.connect(self.open_config_dialog)
         toolbar.addWidget(self.config_btn)
 
-        self.clear_btn = QtWidgets.QPushButton("🗑️ 清空")
+        self.clear_btn = QtWidgets.QPushButton(self.i18n.t("btn_clear"))
         self.clear_btn.clicked.connect(self.clear_chat)
         toolbar.addWidget(self.clear_btn)
 
@@ -753,7 +807,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         input_layout = QtWidgets.QHBoxLayout()
 
         self.input_text = QtWidgets.QTextEdit()
-        self.input_text.setPlaceholderText("输入消息... (Enter 发送, Shift+Enter 换行)")
+        self.input_text.setPlaceholderText(self.i18n.t("input_placeholder"))
         self.input_text.setMaximumHeight(80)
         self.input_text.setStyleSheet("""
             QTextEdit {
@@ -770,7 +824,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.input_text.installEventFilter(self)
         input_layout.addWidget(self.input_text, stretch=1)
 
-        self.send_btn = QtWidgets.QPushButton("发送")
+        self.send_btn = QtWidgets.QPushButton(self.i18n.t("btn_send"))
         self.send_btn.setMinimumHeight(60)
         self.send_btn.setStyleSheet("""
             QPushButton {
@@ -792,7 +846,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         input_layout.addWidget(self.send_btn)
 
         # 停止按钮
-        self.stop_btn = QtWidgets.QPushButton("停止")
+        self.stop_btn = QtWidgets.QPushButton(self.i18n.t("btn_stop"))
         self.stop_btn.setMinimumHeight(60)
         self.stop_btn.setVisible(False)  # 初始隐藏
         self.stop_btn.setStyleSheet("""
@@ -813,26 +867,28 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
         chat_layout.addLayout(input_layout)
 
-        main_tabs.addTab(chat_tab, "💬 AI 对话")
+        self.chat_tab = chat_tab
+        main_tabs.addTab(chat_tab, self.i18n.t("tab_chat"))
 
         # === 标签2: 日志 ===
         self.log_panel = LogPanel()
-        main_tabs.addTab(self.log_panel, "📋 日志")
+        self.main_tabs = main_tabs
+        main_tabs.addTab(self.log_panel, self.i18n.t("tab_logs"))
 
         main_layout.addWidget(main_tabs)
         
         # 菜单栏
         menubar = self.menuBar()
-        help_menu = menubar.addMenu("帮助")
+        self.help_menu = menubar.addMenu(self.i18n.t("menu_help"))
         
-        about_action = QtWidgets.QAction("关于", self)
-        about_action.triggered.connect(self.show_about_dialog)
-        help_menu.addAction(about_action)
+        self.about_action = QtWidgets.QAction(self.i18n.t("menu_about"), self)
+        self.about_action.triggered.connect(self.show_about_dialog)
+        self.help_menu.addAction(self.about_action)
         
         # 状态栏
         self.status_bar = QtWidgets.QStatusBar()
         self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("就绪")
+        self.status_bar.showMessage(self.i18n.t("status_ready"))
     
     def eventFilter(self, obj, event):
         """事件过滤器，处理 Enter 键发送"""
@@ -842,13 +898,59 @@ class AIChatWindow(QtWidgets.QMainWindow):
                 return True
         return super().eventFilter(obj, event)
     
+    def toggle_language(self):
+        """切换语言"""
+        new_lang = self.i18n.toggle_language()
+        # 保存语言设置
+        self.config_manager.set_language(self.i18n.get_language_code())
+        self.log_manager.info(f"Language switched to: {new_lang.value}")
+    
+    def _on_language_changed(self, language):
+        """语言变更回调 - 更新所有 UI 文本"""
+        # 更新窗口标题
+        self.setWindowTitle(self.i18n.t("app_title"))
+        
+        # 更新语言切换按钮
+        self.lang_btn.setText(self.i18n.t("btn_language"))
+        
+        # 更新工具栏按钮
+        self.config_btn.setText(self.i18n.t("btn_config"))
+        self.clear_btn.setText(self.i18n.t("btn_clear"))
+        
+        # 更新 API 标签
+        if self.current_config:
+            self.config_label.setText(f"API: {self.current_config.name}")
+        else:
+            self.config_label.setText(self.i18n.t("api_not_configured"))
+        
+        # 更新输入框占位符
+        self.input_text.setPlaceholderText(self.i18n.t("input_placeholder"))
+        
+        # 更新发送/停止按钮
+        if self.is_streaming:
+            self.stop_btn.setText(self.i18n.t("btn_stop"))
+        else:
+            self.send_btn.setText(self.i18n.t("btn_send"))
+        
+        # 更新标签页标题
+        self.main_tabs.setTabText(0, self.i18n.t("tab_chat"))
+        self.main_tabs.setTabText(1, self.i18n.t("tab_logs"))
+        
+        # 更新菜单
+        self.help_menu.setTitle(self.i18n.t("menu_help"))
+        self.about_action.setText(self.i18n.t("menu_about"))
+        
+        # 更新状态栏
+        if not self.is_streaming:
+            self.status_bar.showMessage(self.i18n.t("status_ready"))
+    
     def load_default_config(self):
         """加载默认配置"""
         config = self.config_manager.get_default_config()
         if config:
             self.current_config = config
             self.config_label.setText(f"API: {config.name}")
-            self.log_manager.info(f"加载当前使用配置: {config.name}")
+            self.log_manager.info(self.i18n.t("log_loaded_config", config.name))
     
     def open_config_dialog(self):
         """打开配置对话框"""
@@ -866,7 +968,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
         self.chat_history.clear()
         self.current_message_widget = None
-        self.log_manager.info("聊天已清空")
+        self.log_manager.info(self.i18n.t("chat_cleared"))
     
     def add_message_widget(self, role: str) -> ChatMessageWidget:
         """添加新的消息部件"""
@@ -899,7 +1001,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
         if not self.current_config:
             self.log_manager.error("未配置 API 配置", LogType.ERROR)
-            QtWidgets.QMessageBox.warning(self, "警告", "请先配置 API")
+            QtWidgets.QMessageBox.warning(self, self.i18n.t("config_warning_title"), self.i18n.t("warn_api_not_configured"))
             return
 
         self.log_manager.info(f"用户: {message[:100]}...", LogType.CHAT_USER)
@@ -925,10 +1027,10 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.is_streaming = True
         self.current_message_widget = None
         self.send_btn.setEnabled(False)
-        self.send_btn.setText("等待...")
+        self.send_btn.setText(self.i18n.t("btn_waiting"))
         self.send_btn.setVisible(False)  # 隐藏发送按钮
         self.stop_btn.setVisible(True)  # 显示停止按钮
-        self.status_bar.showMessage("AI 思考中...")
+        self.status_bar.showMessage(self.i18n.t("status_thinking"))
 
         # 创建新的 AI 消息部件
         self.current_message_widget = self.add_message_widget("assistant")
@@ -1264,7 +1366,7 @@ class AIChatWindow(QtWidgets.QMainWindow):
         """更新工具调用显示"""
         # 在聊天中添加工具调用
         if self.current_message_widget:
-            display_text = f"调用 {tool_name}({json.dumps(arguments, ensure_ascii=False)})"
+            display_text = self.i18n.t("stream_calling", tool_name, json.dumps(arguments, ensure_ascii=False))
             self.current_message_widget.add_text(display_text, "tool_call")
 
         # 记录日志
@@ -1289,8 +1391,8 @@ class AIChatWindow(QtWidgets.QMainWindow):
 
         # 在聊天中显示结果
         if self.current_message_widget:
-            status = "✓" if success else "✗"
-            display_text = f"{status} {tool_name}: {message}"
+            key = "stream_result_success" if success else "stream_result_fail"
+            display_text = self.i18n.t(key, tool_name, message)
             self.current_message_widget.add_text(display_text, "tool_result")
 
         # 记录日志
@@ -1323,10 +1425,10 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.is_streaming = False
         self.current_message_widget = None
         self.send_btn.setEnabled(True)
-        self.send_btn.setText("发送")
+        self.send_btn.setText(self.i18n.t("btn_send"))
         self.send_btn.setVisible(True)  # 显示发送按钮
         self.stop_btn.setVisible(False)  # 隐藏停止按钮
-        self.status_bar.showMessage("就绪")
+        self.status_bar.showMessage(self.i18n.t("status_ready"))
     
     def _on_stream_error(self, error: str):
         """流错误回调（线程安全）"""
@@ -1342,10 +1444,10 @@ class AIChatWindow(QtWidgets.QMainWindow):
         self.log_manager.error(f"✗ 流式错误: {error}", LogType.ERROR)
         self.is_streaming = False
         self.send_btn.setEnabled(True)
-        self.send_btn.setText("发送")
+        self.send_btn.setText(self.i18n.t("btn_send"))
         self.send_btn.setVisible(True)  # 显示发送按钮
         self.stop_btn.setVisible(False)  # 隐藏停止按钮
-        self.status_bar.showMessage(f"错误: {error}")
+        self.status_bar.showMessage(self.i18n.t("error_stream", error))
 
         if self.current_message_widget:
             self.current_message_widget.add_text(f"错误: {error}", "tool_result")
@@ -1398,7 +1500,8 @@ class AboutDialog(QtWidgets.QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("关于 PyMOL AI Assistant")
+        self.i18n = get_i18n_manager()
+        self.setWindowTitle(self.i18n.t("about_title"))
         self.setup_ui()
     
     def setup_ui(self):
@@ -1450,16 +1553,7 @@ class AboutDialog(QtWidgets.QDialog):
         layout.addSpacing(20)
         
         # 插件介绍
-        intro_text = QtWidgets.QLabel(
-            "PyMOL AI Assistant 是一款基于 AI 工具技能（Function Calling）的 PyMOL 插件，\n"
-            "让您可以使用自然语言控制 PyMOL 分子可视化软件。\n\n"
-            "主要功能：\n"
-            "• 🤖 AI 对话 - 使用自然语言控制 PyMOL\n"
-            "• 🌊 流式显示 - 实时显示 AI 思考和输出\n"
-            "• 🔧 工具调用 - AI 可直接操作 PyMOL（加载结构、设置样式、保存图像等）\n"
-            "• ⚙️ 配置管理 - 支持多 API 配置（SiliconFlow、OpenAI 等）\n"
-            "• 📋 日志系统 - 记录所有对话和工具调用"
-        )
+        intro_text = QtWidgets.QLabel(self.i18n.t("about_intro"))
         intro_text.setStyleSheet("font-size: 12px; color: #d4d4d4; line-height: 1.6;")
         intro_text.setAlignment(Qt.AlignLeft)
         intro_text.setWordWrap(True)
@@ -1475,27 +1569,27 @@ class AboutDialog(QtWidgets.QDialog):
         
         author_label = QtWidgets.QLabel("Mo Qiqin")
         author_label.setStyleSheet("color: #d4d4d4;")
-        info_layout.addRow("作者:", author_label)
+        info_layout.addRow(self.i18n.t("about_author"), author_label)
         
         email_label = QtWidgets.QLabel("moqiqin@live.com")
         email_label.setStyleSheet("color: #569cd6;")
-        info_layout.addRow("邮箱:", email_label)
+        info_layout.addRow(self.i18n.t("about_email"), email_label)
         
         # GitHub 链接
         github_link = QtWidgets.QLabel(
             "<a href='https://github.com/Masterchiefm/pymol-ai-assistant' "
             "style='color: #569cd6; text-decoration: none;'>"
-            "GitHub 仓库</a>"
+            "GitHub</a>"
         )
         github_link.setOpenExternalLinks(True)
         github_link.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        info_layout.addRow("项目主页:", github_link)
+        info_layout.addRow(self.i18n.t("about_github"), github_link)
         
         layout.addWidget(info_widget)
         layout.addStretch()
         
         # 捐赠按钮
-        donate_btn = QtWidgets.QPushButton("☕ 请我喝咖啡")
+        donate_btn = QtWidgets.QPushButton(self.i18n.t("about_donate"))
         donate_btn.setStyleSheet("""
             QPushButton {
                 background-color: #d4a574;
@@ -1516,14 +1610,14 @@ class AboutDialog(QtWidgets.QDialog):
         layout.addSpacing(10)
         
         # 关闭按钮
-        close_btn = QtWidgets.QPushButton("关闭")
+        close_btn = QtWidgets.QPushButton(self.i18n.t("about_close"))
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn, alignment=Qt.AlignCenter)
     
     def show_donate(self):
         """显示捐赠二维码"""
         donate_dialog = QtWidgets.QDialog(self)
-        donate_dialog.setWindowTitle("☕ 请我喝咖啡")
+        donate_dialog.setWindowTitle(self.i18n.t("about_donate"))
         donate_dialog.setFixedSize(350, 400)
         donate_dialog.setStyleSheet("""
             QDialog {

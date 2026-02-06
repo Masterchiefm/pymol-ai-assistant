@@ -27,6 +27,7 @@ PyMOL AI Assistant 是一个 PyMOL 分子可视化软件的插件，通过 AI �
 | AI API | OpenAI-compatible API (SiliconFlow, OpenAI, etc.) |
 | Async HTTP | `aiohttp>=3.8.0` |
 | OpenAI SDK | `openai>=1.0.0` |
+| i18n | Custom translation module (`i18n.py`)
 
 ## Project Structure
 
@@ -48,6 +49,9 @@ pymol-ai-assistant/
 │   ├── LogEntry             # Dataclass for log entries
 │   ├── LogManager           # Singleton log manager
 │   └── LogType/LogLevel     # Enums for categorization
+├── i18n.py               # Internationalization module (NEW)
+│   ├── I18nManager          # Language management
+│   └── TRANSLATIONS         # Translation dictionary
 ├── install.py            # Manual installation script
 ├── example_script.pml    # Example PyMOL script
 ├── example_setup.py      # Example Python script
@@ -86,6 +90,7 @@ All modules:
 | `ConfigDialog` | `ai_chat_gui.py` | API configuration UI |
 | `ConfigManager` | `config_manager.py` | Persistent config storage |
 | `LogManager` | `log_manager.py` | Session logging with callbacks |
+| `I18nManager` | `i18n.py` | Language switching and translation |
 | `APIConfig` | `config_manager.py` | Config dataclass |
 | `LogEntry` | `log_manager.py` | Log entry dataclass |
 
@@ -116,6 +121,15 @@ Tools are defined in `pymol_tools.py` following OpenAI Function Calling schema.
 
 - **Windows**: `%USERPROFILE%\.pymol_ai_assistant\config.json`
 - **macOS/Linux**: `~/.pymol_ai_assistant/config.json`
+
+### Config File Format
+
+```json
+{
+  "configs": [...],
+  "language": "zh"  // Language setting: "zh" (Chinese) or "en" (English)
+}
+```
 
 ### Default Configurations
 
@@ -317,6 +331,11 @@ elif tool_name == "pymol_new_tool":
 4. **Local Only**: No network server exposed
 
 ## Version History
+
+### v1.4.0
+- Added bilingual support (Chinese/English) with language switch button
+- Language preference is persisted across restarts
+- All UI elements support dynamic language switching
 
 ### v1.2.0
 - Added geometry tools (distance, angle, dihedral)

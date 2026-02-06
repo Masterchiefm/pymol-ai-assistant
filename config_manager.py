@@ -78,9 +78,14 @@ class ConfigManager:
                     data = json.load(f)
                     configs_data = data.get("configs", [])
                     self.configs = [APIConfig.from_dict(c) for c in configs_data]
+                    # 加载语言设置
+                    self._language = data.get("language", "zh")
             except Exception as e:
                 print(f"[ConfigManager] 加载配置失败: {e}")
                 self.configs = []
+                self._language = "zh"
+        else:
+            self._language = "zh"
         
         # 如果没有配置，使用默认配置
         if not self.configs:
@@ -91,7 +96,8 @@ class ConfigManager:
         """保存配置到文件"""
         try:
             data = {
-                "configs": [c.to_dict() for c in self.configs]
+                "configs": [c.to_dict() for c in self.configs],
+                "language": self._language
             }
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
@@ -99,6 +105,15 @@ class ConfigManager:
         except Exception as e:
             print(f"[ConfigManager] 保存配置失败: {e}")
             return False
+    
+    def get_language(self) -> str:
+        """获取当前语言设置"""
+        return getattr(self, '_language', 'zh')
+    
+    def set_language(self, lang: str) -> bool:
+        """设置语言"""
+        self._language = lang
+        return self.save_configs()
     
     def get_config(self, name: str) -> Optional[APIConfig]:
         """根据名称获取配置"""
@@ -162,7 +177,8 @@ class ConfigManager:
         """导出配置到 JSON 文件"""
         try:
             data = {
-                "configs": [c.to_dict() for c in self.configs]
+                "configs": [c.to_dict() for c in self.configs],
+                "language": self._language
             }
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
