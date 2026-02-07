@@ -2,7 +2,7 @@
 '''
 PyMOL AI Assistant Plugin
 
-Version: 1.4.1
+Version: 1.4.2
 Author: Mo Qiqin
 License: MIT
 

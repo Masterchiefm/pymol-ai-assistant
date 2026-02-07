@@ -258,7 +258,7 @@ class ChatWidget(QtWidgets.QWidget):
         clear_layout.addStretch()
         
         self.clear_btn = StyledButton(i18n._('clear_chat'))
-        self.clear_btn.setFixedSize(70, 30)
+        self.clear_btn.setFixedSize(85, 30)
         self.clear_btn.clicked.connect(self.clear_chat)
         clear_layout.addWidget(self.clear_btn)
         
@@ -906,6 +906,7 @@ class LogWidget(QtWidgets.QWidget):
         
         # 清空按钮
         self.clear_btn = StyledButton(i18n._('clear_log'))
+        self.clear_btn.setFixedSize(85, 30)
         self.clear_btn.clicked.connect(self.on_clear)
         control_layout.addWidget(self.clear_btn)
         
@@ -1226,6 +1227,10 @@ class AIAssistantDialog(QtWidgets.QDialog):
         self.tabs.setDocumentMode(False)
         # 设置标签位置在上方
         self.tabs.setTabPosition(QtWidgets.QTabWidget.North)
+        # 获取TabBar并设置居中对齐
+        tab_bar = self.tabs.tabBar()
+        tab_bar.setExpanding(False)
+        tab_bar.setElideMode(QtCore.Qt.ElideNone)
         self.tabs.setStyleSheet("""
             QTabWidget::pane {
                 border: none;
@@ -1233,7 +1238,7 @@ class AIAssistantDialog(QtWidgets.QDialog):
                 top: 0px;
             }
             QTabBar {
-                alignment: center;
+                qproperty-alignment: AlignCenter;
                 background: transparent;
                 border: none;
             }
