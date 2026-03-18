@@ -202,6 +202,17 @@ cmd.extend("my_function", my_function)
   示例: bg_color white
 - set_color [颜色名], [RGB值] - 定义新颜色
   示例: set_color mycolor, [0.5, 0.8, 0.2]
+- AlphaFold Color
+当需要用颜色展示AF预测结构的准确度（pLDDT）时，使用以下：
+set_color n0, [0.051, 0.341, 0.827]
+set_color n1, [0.416, 0.796, 0.945]
+set_color n2, [0.996, 0.851, 0.212]
+set_color n3, [0.992, 0.490, 0.302]
+color n0, b < 100; color n1, b < 90
+color n2, b < 70;  color n3, b < 50
+- RosettaFold Color
+当需要展示RosettaFold准确度时，用以下命令：
+spectrum b, red_yellow_green_cyan_blue, minimum=0.5, maximum=0.9
 
 【视图控制】
 - zoom [选择], [缓冲], [状态] - 缩放到指定选择
