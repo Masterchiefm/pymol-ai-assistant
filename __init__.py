@@ -56,6 +56,8 @@ def check_and_install_dependencies():
         try:
             subprocess.check_call([
                 python_executable, '-m', 'pip', 'install',
+                '-i', 'http://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple',
+                '--trusted-host', 'mirrors.tuna.tsinghua.edu.cn',
                 '--user', '--quiet'
             ] + missing_packages)
             print("[PyMOL AI Assistant] 依赖安装成功！")

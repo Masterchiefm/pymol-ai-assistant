@@ -12,6 +12,10 @@ from typing import Any
 
 import json_repair
 import litellm
+litellm.drop_params = True
+litellm.suppress_debug_info = True
+litellm.set_verbose = False
+litellm.cost_per_token = {}
 from litellm import completion
 from . import config, tools, logger
 
