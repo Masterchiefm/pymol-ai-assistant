@@ -9,7 +9,7 @@ from datetime import datetime
 
 from pymol.Qt import QtCore, QtWidgets, QtGui
 
-from . import i18n, config, logger, ai_client, tools, get_update_info, __version__ as PLUGIN_VERSION
+from . import i18n, config, logger, ai_client, tools, get_update_info, __version__ as PLUGIN_VERSION, markdown_renderer
 
 
 # 版本号
@@ -193,16 +193,23 @@ class MessageWidget(QtWidgets.QFrame):
         """ % self.bg_color)
     
     def set_content(self, content):
-        """设置内容，支持不同颜色的文本"""
+        """设置内容，支持不同颜色的文本和Markdown渲染"""
         self.raw_content = content
-        
-        # 转义HTML
-        escaped = content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-        
-        # 处理不同样式的文本
+
+        if self.role == 'assistant':
+            html_content = markdown_renderer.MarkdownRenderer.render(content)
+        else:
+            html_content = self._format_text(content)
+
+        self.content_label.setText(html_content)
+
+    def _format_text(self, text):
+        """格式化普通文本，支持不同颜色的文本"""
+        escaped = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
         lines = escaped.split('\n')
         formatted_lines = []
-        
+
         for line in lines:
             if line.strip().startswith('使用工具:') or line.strip().startswith('Using tool:'):
                 formatted_lines.append('<span style="color: #58D68D;">%s</span>' % line)
@@ -214,9 +221,8 @@ class MessageWidget(QtWidgets.QFrame):
                 formatted_lines.append('<span style="color: #F07178;">%s</span>' % line)
             else:
                 formatted_lines.append(line)
-        
-        html_content = '<br>'.join(formatted_lines)
-        self.content_label.setText(html_content)
+
+        return '<br>'.join(formatted_lines)
     
     def append_content(self, text):
         """追加内容"""

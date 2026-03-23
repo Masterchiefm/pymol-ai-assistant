@@ -17,7 +17,7 @@ import sys
 import os
 
 # 版本号
-__version__ = '3.0.1'
+__version__ = '3.0.2'
 
 # 获取插件目录
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
