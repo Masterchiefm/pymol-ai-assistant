@@ -46,6 +46,7 @@ class AIClient:
         self.model = None
         self.api_version = None
         self.is_reasoning_model = False
+        self.is_vision_model = False
         self.temperature = 0.7
         self.max_tokens = 4096
         self.timeout = 60
@@ -59,6 +60,7 @@ class AIClient:
         self.model = api_config.get('model', '')
         self.api_version = api_config.get('api_version', '')
         self.is_reasoning_model = api_config.get('is_reasoning_model', False)
+        self.is_vision_model = api_config.get('is_vision_model', False)
         self.temperature = api_config.get('temperature', 0.7)
         self.max_tokens = api_config.get('max_tokens', 4096)
         self.timeout = api_config.get('timeout', 60)
@@ -124,6 +126,7 @@ class AIClient:
 - pymol_rotate: 旋转视图或选择（支持 x, y, z 轴）
 - pymol_center: 将视图中心移动到指定选择
 - pymol_reset: 重置视图到默认状态
+- pymol_capture_view: 捕获当前PyMOL视图的截图（仅视觉模型可用，让你能够看到实际的画面效果）
 
 其他操作：
 - pymol_select: 创建命名的选择集（支持 chain A, resi 1-100, name CA, resn ASP, elem C 等表达式）
@@ -145,6 +148,7 @@ class AIClient:
 4. 如果操作失败，尝试其他方法
 5. 如果用户询问关于分子结构的问题但没有明确提供PDB ID或文件路径，默认假设结构已经加载到PyMOL中，直接使用pymol_get_info等工具查询当前加载的结构，而不是尝试加载新结构
 6. 选择表达式语法示例：chain A, resi 1-100, name CA, resn ASP, elem C, chain A and resi 50, /1abc//A/50/CA
+7. 如果需要查看当前渲染效果，可以使用 pymol_capture_view 工具捕获截图，这样可以直观地看到画面的实际效果
 """
 
     def _sanitize_messages(self, messages: list[dict]) -> list[dict]:
@@ -178,7 +182,7 @@ class AIClient:
         
         return sanitized
 
-    def _chat(self, messages: list[dict], use_tools: bool = True) -> dict:
+    def _chat(self, messages: list[dict], use_tools: bool = True, images=None) -> dict:
         """
         发送非流式聊天请求
         
@@ -192,9 +196,16 @@ class AIClient:
         """
         model_name = self._get_model_name()
         
+        # 处理视觉模型的图片输入
+        if images and self.is_vision_model:
+            # 修改最后一条用户消息以包含图片
+            processed_messages = self._process_vision_messages(messages, images)
+        else:
+            processed_messages = self._sanitize_messages(messages)
+        
         request_params = {
             'model': model_name,
-            'messages': self._sanitize_messages(messages),
+            'messages': processed_messages,
             'temperature': self.temperature,
             'max_tokens': max(1, self.max_tokens),
             'timeout': self.timeout,
@@ -209,6 +220,7 @@ class AIClient:
         if self.provider == 'azure' and self.api_version:
             request_params['api_version'] = self.api_version
 
+        # 工具调用：普通模型和视觉模型都支持工具调用
         if use_tools:
             request_params['tools'] = tools.TOOLS
             request_params['tool_choice'] = 'auto'
@@ -216,11 +228,95 @@ class AIClient:
         logger.logger.debug(
             logger.AI_REQUEST,
             "发送AI请求",
-            {"provider": self.provider, "model": self.model, "messages": messages}
+            {"provider": self.provider, "model": self.model, "has_images": bool(images)}
         )
 
         response = completion(**request_params)
         return self._parse_response(response)
+    
+    def _process_vision_messages(self, messages: list[dict], images: list) -> list:
+        """
+        处理视觉模型的消息格式
+        
+        Args:
+            messages: 原始消息列表
+            images: 图片数据列表
+            
+        Returns:
+            list: 处理后的消息列表，最后一条用户消息包含图片
+        """
+        processed = []
+        import base64
+        
+        for msg in messages:
+            processed_msg = dict(msg)
+            
+            # 如果是最后一条用户消息且有图片，转换格式
+            if msg.get('role') == 'user' and images:
+                content_list = []
+                
+                # 添加文本内容
+                if msg.get('content'):
+                    content_list.append({
+                        "type": "text",
+                        "text": msg.get('content')
+                    })
+                
+                # 添加图片
+                for img_data in images:
+                    # 将图片数据转换为base64
+                    img_bytes = img_data.get('data')
+                    if img_bytes:
+                        # img_bytes 现在是 bytes 类型，直接编码为 base64
+                        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                        
+                        content_list.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{img_base64}"
+                            }
+                        })
+                
+                if content_list:
+                    processed_msg['content'] = content_list
+            
+            # 处理工具返回的图片（pymol_capture_view）
+            # 工具消息的content必须是字符串，所以我们需要在工具消息后添加一个用户消息来传递图片
+            elif msg.get('role') == 'tool' and msg.get('content'):
+                try:
+                    content = msg.get('content')
+                    if isinstance(content, str):
+                        try:
+                            tool_result = json.loads(content)
+                            if tool_result.get('has_image') and tool_result.get('image_url'):
+                                # 先添加工具消息（字符串格式）
+                                processed_msg['content'] = tool_result.get('message', '截图成功')
+                                processed.append(processed_msg)
+                                # 然后添加一个用户消息包含图片
+                                processed.append({
+                                    'role': 'user',
+                                    'content': [
+                                        {
+                                            "type": "text",
+                                            "text": "这是刚才捕获的PyMOL视图截图："
+                                        },
+                                        {
+                                            "type": "image_url",
+                                            "image_url": {
+                                                "url": tool_result.get('image_url')
+                                            }
+                                        }
+                                    ]
+                                })
+                                continue
+                        except json.JSONDecodeError:
+                            pass
+                except:
+                    pass
+            
+            processed.append(processed_msg)
+        
+        return self._sanitize_messages(processed)
 
     def _parse_response(self, response) -> dict:
         """解析 LiteLLM 响应"""
@@ -265,6 +361,7 @@ class AIClient:
         on_content=None,
         on_tool_call=None,
         on_error=None,
+        images=None,
     ) -> str:
         """
         非流式聊天，支持多轮工具调用
@@ -275,6 +372,7 @@ class AIClient:
             on_content: 内容回调
             on_tool_call: 工具调用回调
             on_error: 错误回调
+            images: 图片列表（仅视觉模型支持）
 
         Returns:
             str: 最终响应内容
@@ -303,7 +401,13 @@ class AIClient:
             iteration += 1
 
             try:
-                response = self._chat(full_messages, use_tools=True)
+                # 如果是视觉模型，处理消息中的图片
+                if self.is_vision_model:
+                    processed_full_messages = self._process_vision_messages(full_messages, images)
+                else:
+                    processed_full_messages = self._sanitize_messages(full_messages)
+                
+                response = self._chat(processed_full_messages, use_tools=True)
             except litellm.AuthenticationError as e:
                 error_msg = "API认证失败: %s" % str(e)
                 logger.logger.error(logger.ERRORS, error_msg)
@@ -388,7 +492,17 @@ class AIClient:
                     on_tool_call(tool_name, arguments_str, result)
 
                 tool_response_content = result.get('message', '')
-                if result.get('output'):
+                
+                if tool_name == 'pymol_capture_view' and result.get('success') and result.get('image_data'):
+                    image_base64 = result.get('image_data')
+                    tool_response_content = json.dumps({
+                        'message': result.get('message'),
+                        'has_image': True,
+                        'image_url': f'data:image/png;base64,{image_base64}',
+                        'width': result.get('width'),
+                        'height': result.get('height')
+                    }, ensure_ascii=False)
+                elif result.get('output'):
                     tool_response_content = result.get('output')
                 elif result.get('data'):
                     tool_response_content = json.dumps(result.get('data'), ensure_ascii=False)

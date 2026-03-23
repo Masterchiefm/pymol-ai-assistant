@@ -89,6 +89,7 @@ TRANSLATIONS = {
         'error_tool_execution': '工具执行错误：{}',
         
         'reasoning_model': '推理模型（支持思考过程）',
+        'vision_model': '视觉模型（支持图片输入）',
         'normal_model': '普通模型',
         
         'menu_language': '语言',
@@ -113,6 +114,9 @@ TRANSLATIONS = {
         'temperature': '温度：',
         'max_tokens': '最大词元数：',
         'timeout': '超时时间(秒)：',
+        
+        'import_image': '导入图片',
+        'paste_image_hint': '或按 Ctrl+V 粘贴图片',
     },
     'en': {
         'window_title': 'PyMOL AI Assistant',
@@ -193,6 +197,7 @@ TRANSLATIONS = {
         'error_tool_execution': 'Tool execution error: {}',
         
         'reasoning_model': 'Reasoning Model (supports thinking)',
+        'vision_model': 'Vision Model (supports image input)',
         'normal_model': 'Normal Model',
         
         'menu_language': 'Language',
@@ -217,6 +222,9 @@ TRANSLATIONS = {
         'temperature': 'Temperature:',
         'max_tokens': 'Max Tokens:',
         'timeout': 'Timeout (s):',
+        
+        'import_image': 'Import Image',
+        'paste_image_hint': 'or press Ctrl+V to paste image',
     }
 }
 

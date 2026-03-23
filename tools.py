@@ -922,6 +922,34 @@ png protein.png, dpi=300, ray=1
                     "required": ["setting", "value"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_capture_view",
+                "description": "捕获当前PyMOL视图的截图。此工具仅在使用视觉模型时可用，返回当前渲染画面的base64编码图片数据，让AI能够看到实际的画面效果。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "width": {
+                            "type": "integer",
+                            "description": "截图宽度（像素），默认800，最大1920",
+                            "default": 800
+                        },
+                        "height": {
+                            "type": "integer",
+                            "description": "截图高度（像素），默认600，最大1080",
+                            "default": 600
+                        },
+                        "ray": {
+                            "type": "integer",
+                            "description": "是否使用光线追踪渲染（1=是，0=否），默认0",
+                            "default": 0
+                        }
+                    },
+                    "required": []
+                }
+            }
         }
     ]
 
@@ -1940,6 +1968,61 @@ class ToolExecutor:
                 "message": f"已设置 {setting} = {value}",
                 "output": feedback_text
             }
+
+        elif tool_name == "pymol_capture_view":
+            import base64
+            import tempfile
+            import os
+
+            width = arguments.get("width", 800)
+            height = arguments.get("height", 600)
+            ray = arguments.get("ray", 0)
+
+            width = min(max(width, 200), 1920)
+            height = min(max(height, 200), 1080)
+
+            try:
+                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                    tmp_filename = tmp_file.name
+
+                cmd._get_feedback()
+
+                if ray == 1:
+                    cmd.ray(width, height)
+
+                cmd.png(tmp_filename, width=width, height=height, ray=0)
+
+                feedback = cmd._get_feedback()
+                feedback_text = "\n".join(feedback) if feedback else ""
+
+                with open(tmp_filename, 'rb') as f:
+                    image_data = f.read()
+
+                image_base64 = base64.b64encode(image_data).decode('utf-8')
+
+                try:
+                    os.unlink(tmp_filename)
+                except:
+                    pass
+
+                return {
+                    "success": True,
+                    "message": f"已捕获视图截图 ({width}x{height})",
+                    "image_data": image_base64,
+                    "width": width,
+                    "height": height,
+                    "format": "png"
+                }
+
+            except Exception as e:
+                error_msg = f"捕获视图失败: {str(e)}"
+                feedback = cmd._get_feedback()
+                feedback_text = "\n".join(feedback) if feedback else ""
+                return {
+                    "success": False,
+                    "message": error_msg,
+                    "output": feedback_text
+                }
 
         else:
             error_msg = f"未知工具: {tool_name}"

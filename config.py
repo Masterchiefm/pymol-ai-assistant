@@ -185,6 +185,7 @@ def create_default_config(name, provider_id='openai'):
         'model': models[0] if models else '',
         'api_version': '',
         'is_reasoning_model': False,
+        'is_vision_model': False,
         'temperature': 0.7,
         'max_tokens': 4096,
         'timeout': 60,

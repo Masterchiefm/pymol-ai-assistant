@@ -116,13 +116,14 @@ class StyledButton(QtWidgets.QPushButton):
 class MessageWidget(QtWidgets.QFrame):
     """单条消息组件"""
     
-    def __init__(self, role, content, parent=None):
+    def __init__(self, role, content, images=None, parent=None):
         super().__init__(parent)
         self.role = role
         self.raw_content = content
+        self.images = images or []
         self.setObjectName("messageWidget")
         self.setup_ui()
-        self.set_content(content)
+        self.set_content(content, self.images)
     
     def setup_ui(self):
         # 去掉边框
@@ -164,6 +165,14 @@ class MessageWidget(QtWidgets.QFrame):
         self.role_label.setStyleSheet("color: %s; font-size: 14px; background: transparent;" % role_color)
         layout.addWidget(self.role_label)
         
+        # 图片显示区域
+        self.image_container = QtWidgets.QWidget()
+        self.image_layout = QtWidgets.QHBoxLayout(self.image_container)
+        self.image_layout.setSpacing(8)
+        self.image_layout.setContentsMargins(0, 0, 0, 0)
+        self.image_container.hide()
+        layout.addWidget(self.image_container)
+        
         # 内容标签 - 设置为可复制
         self.content_label = QtWidgets.QLabel()
         self.content_label.setWordWrap(True)
@@ -192,9 +201,10 @@ class MessageWidget(QtWidgets.QFrame):
             }
         """ % self.bg_color)
     
-    def set_content(self, content):
+    def set_content(self, content, images=None):
         """设置内容，支持不同颜色的文本和Markdown渲染"""
         self.raw_content = content
+        self.images = images or []
 
         if self.role == 'assistant':
             html_content = markdown_renderer.MarkdownRenderer.render(content)
@@ -202,6 +212,43 @@ class MessageWidget(QtWidgets.QFrame):
             html_content = self._format_text(content)
 
         self.content_label.setText(html_content)
+        
+        # 显示图片
+        self._display_images()
+    
+    def _display_images(self):
+        """显示图片"""
+        # 清除现有图片
+        while self.image_layout.count():
+            item = self.image_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        # 添加图片
+        for img_data in self.images:
+            pixmap = img_data['pixmap']
+            # 限制最大尺寸
+            max_width = 300
+            max_height = 200
+            scaled_pixmap = pixmap.scaled(
+                max_width, max_height, 
+                QtCore.Qt.KeepAspectRatio, 
+                QtCore.Qt.SmoothTransformation
+            )
+            
+            label = QtWidgets.QLabel()
+            label.setPixmap(scaled_pixmap)
+            label.setStyleSheet("""
+                QLabel {
+                    border: 1px solid #555555;
+                    border-radius: 8px;
+                    padding: 5px;
+                }
+            """)
+            label.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+            self.image_layout.addWidget(label)
+        
+        self.image_container.setVisible(bool(self.images))
 
     def _format_text(self, text):
         """格式化普通文本，支持不同颜色的文本"""
@@ -232,7 +279,7 @@ class MessageWidget(QtWidgets.QFrame):
 class ChatWidget(QtWidgets.QWidget):
     """聊天标签页"""
     
-    message_sent = QtCore.Signal(str)
+    message_sent = QtCore.Signal(str, list)
     stop_requested = QtCore.Signal()
     
     def __init__(self, parent=None):
@@ -244,6 +291,7 @@ class ChatWidget(QtWidgets.QWidget):
         self.loading_dots = 0
         self.loading_timer = QtCore.QTimer()
         self.loading_timer.timeout.connect(self._update_loading_animation)
+        self.current_images = []
         self.setup_ui()
     
     def setup_ui(self):
@@ -331,6 +379,17 @@ class ChatWidget(QtWidgets.QWidget):
         input_layout.setContentsMargins(15, 12, 15, 12)
         input_layout.setSpacing(8)
         
+        # 图片预览区域
+        self.image_preview_container = QtWidgets.QWidget()
+        self.image_preview_layout = QtWidgets.QHBoxLayout(self.image_preview_container)
+        self.image_preview_layout.setContentsMargins(0, 0, 0, 0)
+        self.image_preview_layout.setSpacing(5)
+        self.image_preview_container.hide()
+        input_layout.addWidget(self.image_preview_container)
+        
+        # 输入框和图片导入按钮的水平布局
+        input_row_layout = QtWidgets.QHBoxLayout()
+        
         # 输入框
         self.input_text = QtWidgets.QTextEdit()
         self.input_text.setPlaceholderText(i18n._('input_placeholder'))
@@ -347,7 +406,36 @@ class ChatWidget(QtWidgets.QWidget):
                 color: #888888;
             }
         """)
-        input_layout.addWidget(self.input_text)
+        input_row_layout.addWidget(self.input_text)
+        
+        # 图片导入按钮
+        self.image_btn = QtWidgets.QPushButton()
+        self.image_btn.setFixedSize(40, 40)
+        self.image_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4A4A4A;
+                border: 1px solid #555555;
+                border-radius: 8px;
+                padding: 5px;
+                color: #5DADE2;
+                font-size: 20px;
+            }
+            QPushButton:hover {
+                background-color: #555555;
+                border-color: #5DADE2;
+                color: #76C5F0;
+            }
+            QPushButton:pressed {
+                background-color: #3A3A3A;
+            }
+        """)
+        self.image_btn.setText("🖼️")
+        self.image_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.image_btn.clicked.connect(self.import_image)
+        self.image_btn.setToolTip(i18n._('import_image'))
+        input_row_layout.addWidget(self.image_btn)
+        
+        input_layout.addLayout(input_row_layout)
         
         # 发送按钮（右下角）
         btn_layout = QtWidgets.QHBoxLayout()
@@ -366,10 +454,17 @@ class ChatWidget(QtWidgets.QWidget):
         self.input_text.installEventFilter(self)
     
     def eventFilter(self, obj, event):
-        if obj == self.input_text and event.type() == QtCore.QEvent.KeyPress:
-            if event.key() == QtCore.Qt.Key_Return and not event.modifiers() & QtCore.Qt.ShiftModifier:
-                self.on_send_clicked()
-                return True
+        if obj == self.input_text:
+            event_type = event.type()
+            if event_type == QtCore.QEvent.Type.KeyPress:
+                if event.key() == QtCore.Qt.Key_Return and not event.modifiers() & QtCore.Qt.ShiftModifier:
+                    self.on_send_clicked()
+                    return True
+            elif event_type == 6:
+                mime_data = event.mimeData()
+                if mime_data.hasImage():
+                    self.handle_pasted_image(mime_data.imageData())
+                    return True
         return super().eventFilter(obj, event)
     
     def on_send_clicked(self):
@@ -379,11 +474,128 @@ class ChatWidget(QtWidgets.QWidget):
             return
         
         text = self.input_text.toPlainText().strip()
-        if text:
-            self.add_message('user', text)
+        if text or self.current_images:
+            # 在清空 current_images 之前，先创建副本用于发送
+            images_to_send = list(self.current_images)
+            
+            self.add_message('user', text, self.current_images)
             self.input_text.clear()
-            self.message_sent.emit(text)
+            self.clear_images()
+            self.message_sent.emit(text, images_to_send)
             self.set_streaming_state(True)
+    
+    def import_image(self):
+        """导入图片"""
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, i18n._('import_image'), "", 
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
+        )
+        if filename:
+            pixmap = QtGui.QPixmap(filename)
+            if not pixmap.isNull():
+                self.add_image_to_current(pixmap)
+    
+    def handle_pasted_image(self, image_data):
+        """处理粘贴的图片"""
+        if isinstance(image_data, QtGui.QPixmap):
+            if not image_data.isNull():
+                self.add_image_to_current(image_data)
+    
+    def add_image_to_current(self, pixmap):
+        """添加图片到当前图片列表"""
+        # 缩放图片以适应预览
+        scaled_pixmap = pixmap.scaled(100, 100, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+        
+        # 保存原始图片数据（使用原图，不要用预览图）
+        import base64
+        buffer = QtCore.QBuffer()
+        buffer.open(QtCore.QIODevice.WriteOnly)
+        pixmap.save(buffer, 'PNG')
+        image_base64 = bytes(buffer.data())
+        buffer.close()
+        
+        self.current_images.append({
+            'pixmap': pixmap,
+            'preview': scaled_pixmap,
+            'data': image_base64
+        })
+        
+        self.update_image_preview()
+    
+    def update_image_preview(self):
+        """更新图片预览"""
+        # 清除现有预览
+        while self.image_preview_layout.count():
+            item = self.image_preview_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        # 添加图片预览
+        for i, img_data in enumerate(self.current_images):
+            label = QtWidgets.QLabel()
+            label.setPixmap(img_data['preview'])
+            label.setStyleSheet("""
+                QLabel {
+                    border: 1px solid #555555;
+                    border-radius: 5px;
+                    padding: 2px;
+                }
+            """)
+            
+            # 添加删除按钮
+            container = QtWidgets.QWidget()
+            container.setStyleSheet("background: transparent;")
+            container_layout = QtWidgets.QVBoxLayout(container)
+            container_layout.setContentsMargins(0, 0, 0, 0)
+            container_layout.setSpacing(2)
+            
+            delete_btn = QtWidgets.QPushButton("×")
+            delete_btn.setFixedSize(20, 20)
+            delete_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #E74C3C;
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 14px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #C0392B;
+                }
+            """)
+            delete_btn.clicked.connect(lambda idx=i: self.remove_image(idx))
+            
+            wrapper = QtWidgets.QWidget()
+            wrapper.setStyleSheet("background: transparent;")
+            wrapper_layout = QtWidgets.QVBoxLayout(wrapper)
+            wrapper_layout.setContentsMargins(0, 0, 0, 0)
+            wrapper_layout.setSpacing(0)
+            wrapper_layout.addWidget(label)
+            wrapper_layout.addWidget(delete_btn, alignment=QtCore.Qt.AlignRight)
+            
+            self.image_preview_layout.addWidget(wrapper)
+        
+        self.image_preview_container.setVisible(bool(self.current_images))
+    
+    def remove_image(self, index):
+        """移除图片"""
+        if 0 <= index < len(self.current_images):
+            del self.current_images[index]
+            self.update_image_preview()
+    
+    def clear_images(self):
+        """清除所有图片"""
+        self.current_images.clear()
+        self.update_image_preview()
+    
+    def update_vision_mode(self, is_vision_model):
+        """根据配置更新视觉模式"""
+        self.image_btn.setVisible(is_vision_model)
+        
+        # 如果不是视觉模式，清除当前图片
+        if not is_vision_model and self.current_images:
+            self.clear_images()
     
     def set_streaming_state(self, streaming):
         """设置流式状态"""
@@ -427,15 +639,15 @@ class ChatWidget(QtWidgets.QWidget):
         self.loading_timer.stop()
         self.loading_indicator.hide()
     
-    def add_message(self, role, content):
+    def add_message(self, role, content, images=None):
         """添加消息 - 插入到加载指示器之前"""
-        msg_widget = MessageWidget(role, content)
+        msg_widget = MessageWidget(role, content, images)
         # 插入到倒数第二个位置（加载指示器之前）
         insert_pos = self.messages_layout.count() - 2
         if insert_pos < 0:
             insert_pos = 0
         self.messages_layout.insertWidget(insert_pos, msg_widget)
-        self.messages.append({'role': role, 'widget': msg_widget})
+        self.messages.append({'role': role, 'widget': msg_widget, 'images': images})
         self.current_message_widget = msg_widget
         self.scroll_to_bottom()
         return msg_widget
@@ -518,6 +730,8 @@ class ConfigWidget(QtWidgets.QWidget):
 
         if hasattr(self, 'reasoning_checkbox'):
             self.reasoning_checkbox.setText(i18n._('reasoning_model'))
+        if hasattr(self, 'vision_checkbox'):
+            self.vision_checkbox.setText(i18n._('vision_model'))
         if hasattr(self, 'current_checkbox'):
             self.current_checkbox.setText(i18n._('set_as_current'))
         if hasattr(self, 'advanced_toggle'):
@@ -738,6 +952,11 @@ class ConfigWidget(QtWidgets.QWidget):
         form_layout.addWidget(self.reasoning_checkbox, row, 0, 1, 2)
         
         row += 1
+        self.vision_checkbox = QtWidgets.QCheckBox(i18n._('vision_model'))
+        self.vision_checkbox.setStyleSheet(checkbox_style)
+        form_layout.addWidget(self.vision_checkbox, row, 0, 1, 2)
+        
+        row += 1
         self.current_checkbox = QtWidgets.QCheckBox(i18n._('set_as_current'))
         self.current_checkbox.setStyleSheet(checkbox_style)
         form_layout.addWidget(self.current_checkbox, row, 0, 1, 2)
@@ -938,6 +1157,7 @@ class ConfigWidget(QtWidgets.QWidget):
         
         self.version_edit.setText(cfg.get('api_version', ''))
         self.reasoning_checkbox.setChecked(cfg.get('is_reasoning_model', False))
+        self.vision_checkbox.setChecked(cfg.get('is_vision_model', False))
         self.temp_spin.setValue(cfg.get('temperature', 0.7))
         self.max_tokens_spin.setValue(cfg.get('max_tokens', 4096))
         self.timeout_spin.setValue(cfg.get('timeout', 60))
@@ -956,6 +1176,7 @@ class ConfigWidget(QtWidgets.QWidget):
         self.model_combo.setEditText('')
         self.version_edit.clear()
         self.reasoning_checkbox.setChecked(False)
+        self.vision_checkbox.setChecked(False)
         self.current_checkbox.setChecked(False)
         self.temp_spin.setValue(0.7)
         self.max_tokens_spin.setValue(4096)
@@ -992,6 +1213,7 @@ class ConfigWidget(QtWidgets.QWidget):
             'model': model,
             'api_version': self.version_edit.text().strip(),
             'is_reasoning_model': self.reasoning_checkbox.isChecked(),
+            'is_vision_model': self.vision_checkbox.isChecked(),
             'temperature': self.temp_spin.value(),
             'max_tokens': self.max_tokens_spin.value(),
             'timeout': self.timeout_spin.value(),
@@ -1793,11 +2015,24 @@ class AIAssistantDialog(QtWidgets.QDialog):
         if cfg:
             ai_client.ai_client.set_config(cfg)
             logger.logger.info(logger.SYSTEM, "AI client initialized", cfg)
+            
+            # 初始化视觉模式状态
+            is_vision = cfg.get('is_vision_model', False)
+            self.chat_widget.update_vision_mode(is_vision)
     
-    def on_message_sent(self, text):
+    def on_message_sent(self, text, images=None):
         cfg = config.config_manager.get_current_config()
         if not cfg:
             QtWidgets.QMessageBox.warning(self, i18n._('error_no_config'), i18n._('error_no_config'))
+            return
+        
+        # 如果有图片但配置不是视觉模型，给出提示
+        if images and not cfg.get('is_vision_model', False):
+            QtWidgets.QMessageBox.warning(
+                self, 
+                i18n._('error_no_config'), 
+                "当前配置未启用视觉模型功能，请在配置页勾选'视觉模型'选项"
+            )
             return
         
         ai_client.ai_client.set_config(cfg)
@@ -1806,15 +2041,51 @@ class AIAssistantDialog(QtWidgets.QDialog):
         logger.logger.info(
             logger.USER_INPUT, 
             "用户发送消息", 
-            {"content": text}
+            {"content": text, "has_images": bool(images)}
         )
         
-        messages = self.chat_widget.get_messages_for_api()
+        # 获取历史消息（用于上下文）
+        history_messages = self.chat_widget.get_messages_for_api()
+        
+        # 如果有图片，需要为最后一条用户消息添加图片信息
+        if images:
+            # 找到最后一条用户消息（就是刚刚添加的那条）
+            last_user_msg = None
+            last_user_msg_index = -1
+            for i, msg in enumerate(history_messages):
+                if msg['role'] == 'user':
+                    last_user_msg_index = i
+                    last_user_msg = msg
+            
+            if last_user_msg and last_user_msg['content'] == text:
+                # 构建视觉模型的消息格式
+                content_list = []
+                
+                if text:
+                    content_list.append({
+                        "type": "text",
+                        "text": text
+                    })
+                
+                import base64
+                for img_data in images:
+                    img_bytes = img_data.get('data')
+                    if img_bytes:
+                        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                        content_list.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{img_base64}"
+                            }
+                        })
+                
+                if content_list:
+                    history_messages[last_user_msg_index]['content'] = content_list
         
         # 记录发送到AI服务器的请求
         request_data = {
             "model": cfg.get('model'),
-            "messages": messages,
+            "messages": history_messages,
             "stream": False,
             "tools": "enabled"
         }
@@ -1824,7 +2095,8 @@ class AIAssistantDialog(QtWidgets.QDialog):
             request_data
         )
         
-        self.worker = AIStreamWorker(messages)
+        # 不再传递 images 给 worker，因为已经合并到 messages 中了
+        self.worker = AIStreamWorker(history_messages, None)
         self.worker.thinking_signal.connect(self.on_thinking)
         self.worker.content_signal.connect(self.on_content)
         self.worker.tool_signal.connect(self.on_tool_call)
@@ -1865,7 +2137,23 @@ class AIAssistantDialog(QtWidgets.QDialog):
     def on_tool_call(self, tool_name, params, result):
         # 只处理有结果的情况，避免重复显示
         if result is not None:
-            self.chat_widget.add_message('tool', "使用工具: %s\n参数: %s\n结果: %s" % (tool_name, params, result))
+            # 如果是截图工具且返回了图片，显示图片
+            if tool_name == 'pymol_capture_view' and result.get('success') and result.get('image_data'):
+                import base64
+                from pymol.Qt import QtGui
+                
+                image_data = result.get('image_data')
+                img_bytes = base64.b64decode(image_data)
+                pixmap = QtGui.QPixmap()
+                pixmap.loadFromData(img_bytes)
+                
+                if not pixmap.isNull():
+                    # 显示工具调用和截图
+                    self.chat_widget.add_message('tool', "使用工具: %s\n参数: %s\n结果: %s" % (tool_name, params, result.get('message')), images=[{'pixmap': pixmap, 'preview': pixmap}])
+                else:
+                    self.chat_widget.add_message('tool', "使用工具: %s\n参数: %s\n结果: %s" % (tool_name, params, result))
+            else:
+                self.chat_widget.add_message('tool', "使用工具: %s\n参数: %s\n结果: %s" % (tool_name, params, result))
     
     def on_error(self, error_msg):
         # 记录错误到日志
@@ -1884,6 +2172,12 @@ class AIAssistantDialog(QtWidgets.QDialog):
     
     def on_config_changed(self):
         self.init_ai_client()
+        
+        # 更新聊天界面的视觉模式
+        cfg = config.config_manager.get_current_config()
+        if cfg:
+            is_vision = cfg.get('is_vision_model', False)
+            self.chat_widget.update_vision_mode(is_vision)
 
 
 class AIStreamWorker(QtCore.QThread):
@@ -1895,9 +2189,10 @@ class AIStreamWorker(QtCore.QThread):
     error_signal = QtCore.Signal(str)
     finished_signal = QtCore.Signal()
     
-    def __init__(self, messages):
+    def __init__(self, messages, images=None):
         super().__init__()
         self.messages = messages
+        self.images = images or []
         self._is_running = True
     
     def run(self):
@@ -1930,7 +2225,8 @@ class AIStreamWorker(QtCore.QThread):
                 on_thinking=on_thinking,
                 on_content=on_content,
                 on_tool_call=on_tool_call,
-                on_error=on_error
+                on_error=on_error,
+                images=self.images
             )
             
             logger.logger.info(
