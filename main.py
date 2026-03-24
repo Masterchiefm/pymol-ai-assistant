@@ -4,12 +4,13 @@
 '''
 
 import os
+import sys
 import json
 from datetime import datetime
 
 from pymol.Qt import QtCore, QtWidgets, QtGui
 
-from . import i18n, config, logger, ai_client, tools, get_update_info, __version__ as PLUGIN_VERSION, markdown_renderer
+from . import i18n, config, logger, ai_client, tools, get_update_info, __version__ as PLUGIN_VERSION, markdown_renderer, updater
 
 
 # 版本号
@@ -1834,7 +1835,7 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle(i18n._('update_title') if hasattr(i18n, '_') and i18n._('update_title') != 'update_title' else ("Update Available" if i18n.get_language() == 'en' else "发现新版本"))
-        dialog.setFixedSize(450, 350)
+        dialog.setFixedSize(500, 450)
 
         # 深色主题样式
         dialog.setStyleSheet("""
@@ -1855,6 +1856,19 @@ class AIAssistantDialog(QtWidgets.QDialog):
             }
             QPushButton:hover {
                 background-color: #76C5F0;
+            }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #888888;
+            }
+            QTextEdit {
+                background-color: #1E1E1E;
+                color: #CCCCCC;
+                border: none;
+                border-radius: 8px;
+                padding: 10px;
+                font-family: Consolas, Monaco, monospace;
+                font-size: 11px;
             }
         """)
 
@@ -1880,44 +1894,70 @@ class AIAssistantDialog(QtWidgets.QDialog):
         version_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(version_label)
 
-        layout.addSpacing(20)
+        layout.addSpacing(10)
 
-        # 提示信息
-        hint_text = (
-            "A new version of PyMOL AI Assistant is available.\n\n"
-            "Please uninstall the old version before installing the new one.\n\n"
-            "Click the button below to download the latest version:"
-        ) if is_en else (
-            "PyMOL AI Assistant 有新版本可用。\n\n"
-            "请在安装新版前卸载旧版本。\n\n"
-            "点击下方按钮下载最新版本："
-        )
-        hint_label = QtWidgets.QLabel(hint_text)
-        hint_label.setStyleSheet("font-size: 13px; color: #CCCCCC; line-height: 1.6;")
-        hint_label.setAlignment(QtCore.Qt.AlignLeft)
-        hint_label.setWordWrap(True)
-        layout.addWidget(hint_label)
+        # 更新内容
+        release_info = update_info.get('release_info', '')
+        if release_info:
+            release_label = QtWidgets.QLabel(("Release Notes:" if is_en else "更新内容：") + "\n")
+            release_label.setStyleSheet("font-size: 13px; color: #CCCCCC; font-weight: bold;")
+            layout.addWidget(release_label)
+            
+            release_text = QtWidgets.QTextEdit()
+            release_text.setPlainText(release_info)
+            release_text.setReadOnly(True)
+            release_text.setMaximumHeight(150)
+            layout.addWidget(release_text)
 
         layout.addStretch()
 
-        # 下载按钮
-        download_btn = QtWidgets.QPushButton("Download" if is_en else "前往下载")
-        download_btn.setStyleSheet("""
+        # 按钮区域
+        btn_layout = QtWidgets.QHBoxLayout()
+        btn_layout.setSpacing(10)
+
+        # 安装更新按钮
+        install_btn = QtWidgets.QPushButton("Install Update" if is_en else "安装更新")
+        install_btn.setStyleSheet("""
             QPushButton {
                 background-color: #58D68D;
                 color: #2D2D2D;
                 border: none;
                 border-radius: 8px;
-                padding: 12px 30px;
+                padding: 12px 24px;
                 font-size: 14px;
                 font-weight: bold;
             }
             QPushButton:hover {
                 background-color: #76E8A0;
             }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #888888;
+            }
         """)
-        download_btn.clicked.connect(lambda: self.open_update_page_and_close(dialog))
-        layout.addWidget(download_btn, alignment=QtCore.Qt.AlignCenter)
+        install_btn.clicked.connect(lambda: self.install_update(dialog))
+        btn_layout.addWidget(install_btn)
+
+        # 查看更新内容按钮
+        view_btn = QtWidgets.QPushButton("View Release" if is_en else "查看更新内容")
+        view_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #5DADE2;
+                color: #2D2D2D;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #76C5F0;
+            }
+        """)
+        view_btn.clicked.connect(lambda: self.open_update_page_and_close(dialog))
+        btn_layout.addWidget(view_btn)
+
+        layout.addLayout(btn_layout)
 
         layout.addSpacing(10)
 
@@ -1939,6 +1979,107 @@ class AIAssistantDialog(QtWidgets.QDialog):
         layout.addWidget(close_btn, alignment=QtCore.Qt.AlignCenter)
 
         dialog.exec_()
+
+    def install_update(self, dialog):
+        """安装更新"""
+        from PyQt5.QtWidgets import QMessageBox, QProgressDialog
+        from PyQt5.QtCore import Qt
+        
+        is_en = i18n.get_language() == 'en'
+        
+        # 创建进度对话框
+        progress = QProgressDialog(dialog)
+        progress.setWindowTitle("Installing Update" if is_en else "安装更新")
+        progress.setLabelText("Downloading from Gitee..." if is_en else "从Gitee下载中...")
+        progress.setRange(0, 100)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.show()
+        
+        # 创建下载线程
+        download_thread = updater.DownloadThread(is_en)
+        
+        # 连接信号
+        download_thread.progress.connect(progress.setValue)
+        download_thread.status.connect(progress.setLabelText)
+        download_thread.finished.connect(lambda success, error, temp_file: self.on_download_finished(dialog, progress, success, error, temp_file, is_en))
+        
+        # 启动线程
+        download_thread.start()
+        
+        # 保存线程引用
+        self._download_thread = download_thread
+    
+    def on_download_finished(self, dialog, progress, success, error, temp_file, is_en):
+        """下载完成处理 - 在主线程中执行安装"""
+        from PyQt5.QtWidgets import QMessageBox
+        
+        if success and temp_file:
+            # 下载成功，开始安装
+            progress.setLabelText("Installing plugin..." if is_en else "安装插件中...")
+            progress.setValue(90)
+            
+            try:
+                # 在主线程中安装插件
+                sys.path.insert(0, r'C:\Users\moqiq\PycharmProjects\pymol-open-source-master\modules')
+                from pymol.plugins.installation import installPluginFromFile
+                
+                installPluginFromFile(temp_file)
+                
+                progress.setValue(100)
+                progress.close()
+                
+                QMessageBox.information(
+                    dialog,
+                    "Success" if is_en else "安装成功",
+                    "Update installed successfully!\n\nPlease restart PyMOL to use the new version." if is_en else "更新安装成功！\n\n请重启PyMOL以使用新版本。"
+                )
+                dialog.accept()
+                
+            except Exception as e:
+                progress.close()
+                QMessageBox.critical(
+                    dialog,
+                    "Error" if is_en else "错误",
+                    f"Failed to install plugin: {str(e)}" if is_en else 
+                    f"安装插件失败: {str(e)}"
+                )
+        
+        else:
+            progress.close()
+            
+            if error == "Download failed":
+                # 都超时了，提示用户手动下载
+                msg_box = QMessageBox(dialog)
+                msg_box.setWindowTitle("Download Failed" if is_en else "下载失败")
+                msg_box.setText(
+                    "Download timeout. Please download manually from the release page:" if is_en else 
+                    "下载超时。请从以下发布页面手动下载："
+                )
+                msg_box.setIcon(QMessageBox.Warning)
+                
+                # 添加跳转按钮
+                gitee_btn = msg_box.addButton("Gitee", QMessageBox.ActionRole)
+                github_btn = msg_box.addButton("GitHub", QMessageBox.ActionRole)
+                msg_box.addButton(QMessageBox.Ok)
+                
+                msg_box.exec_()
+                
+                # 处理按钮点击
+                clicked_btn = msg_box.clickedButton()
+                if clicked_btn == gitee_btn:
+                    import webbrowser
+                    webbrowser.open("https://gitee.com/MasterChiefm/pymol-ai-assistant/releases")
+                elif clicked_btn == github_btn:
+                    import webbrowser
+                    webbrowser.open("https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest")
+            else:
+                # 其他错误
+                QMessageBox.critical(
+                    dialog,
+                    "Error" if is_en else "错误",
+                    f"Failed to download update: {error}" if is_en else 
+                    f"下载更新失败: {error}"
+                )
 
     def open_update_page_and_close(self, dialog):
         """打开更新页面并关闭对话框"""
