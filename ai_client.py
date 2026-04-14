@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-AI客户端模块 - 使用LiteLLM，非流式调用
+AI客户端模块 - 使用LiteLLM，流式输出 + 非流式工具调用
 LiteLLM提供统一的API接口，支持100+LLM提供商
+流式模式下 content/reasoning 实时输出，tool_calls 等流结束后统一解析
 """
 
 import hashlib
@@ -52,7 +53,7 @@ def _normalize_tool_call_id(tool_call_id: Any) -> Any:
 
 
 class AIClient:
-    """AI客户端 - 基于LiteLLM，非流式调用"""
+    """AI客户端 - 基于LiteLLM，流式输出 + 非流式工具调用"""
 
     def __init__(self):
         self.provider = None
@@ -270,7 +271,7 @@ class AIClient:
 
     def _chat(self, messages: list[dict], use_tools: bool = True, images=None) -> dict:
         """
-        发送非流式聊天请求
+        发送非流式聊天请求（用于 test_connection 等）
 
         Returns:
             dict: {
@@ -281,36 +282,13 @@ class AIClient:
             }
         """
         _ensure_litellm()
-        model_name = self._get_model_name()
 
-        # 处理视觉模型的图片输入
         if images and self.is_vision_model:
-            # 修改最后一条用户消息以包含图片
             processed_messages = self._process_vision_messages(messages, images)
         else:
             processed_messages = self._sanitize_messages(messages)
 
-        request_params = {
-            "model": model_name,
-            "messages": processed_messages,
-            "temperature": self.temperature,
-            "max_tokens": max(1, self.max_tokens),
-            "timeout": self.timeout,
-        }
-
-        if self.api_key:
-            request_params["api_key"] = self.api_key
-
-        if self.api_url:
-            request_params["api_base"] = self.api_url
-
-        if self.provider == "azure" and self.api_version:
-            request_params["api_version"] = self.api_version
-
-        # 工具调用：普通模型和视觉模型都支持工具调用
-        if use_tools:
-            request_params["tools"] = tools.get_tool_definitions(self.is_vision_model)
-            request_params["tool_choice"] = "auto"
+        request_params = self._build_request_params(processed_messages, use_tools)
 
         logger.logger.debug(
             logger.AI_REQUEST,
@@ -452,6 +430,142 @@ class AIClient:
             "finish_reason": finish_reason,
         }
 
+    def _build_request_params(
+        self, messages: list[dict], use_tools: bool = True
+    ) -> dict:
+        """构建 LiteLLM 请求参数"""
+        model_name = self._get_model_name()
+
+        request_params = {
+            "model": model_name,
+            "messages": messages,
+            "temperature": self.temperature,
+            "max_tokens": max(1, self.max_tokens),
+            "timeout": self.timeout,
+        }
+
+        if self.api_key:
+            request_params["api_key"] = self.api_key
+
+        if self.api_url:
+            request_params["api_base"] = self.api_url
+
+        if self.provider == "azure" and self.api_version:
+            request_params["api_version"] = self.api_version
+
+        if use_tools:
+            request_params["tools"] = tools.get_tool_definitions(self.is_vision_model)
+            request_params["tool_choice"] = "auto"
+
+        return request_params
+
+    def _chat_stream(
+        self,
+        messages: list[dict],
+        use_tools: bool = True,
+        on_thinking=None,
+        on_content=None,
+    ) -> dict:
+        """
+        流式聊天请求：content/thinking 实时输出，tool_calls 等流结束后统一解析
+
+        Returns:
+            dict: {
+                'content': str,
+                'tool_calls': list,
+                'reasoning_content': str,
+                'finish_reason': str
+            }
+        """
+        _ensure_litellm()
+
+        request_params = self._build_request_params(messages, use_tools)
+        request_params["stream"] = True
+        request_params["stream_options"] = {"include_usage": True}
+
+        logger.logger.debug(
+            logger.AI_REQUEST,
+            "发送流式AI请求",
+            {
+                "provider": self.provider,
+                "model": self.model,
+                "stream": True,
+            },
+        )
+
+        response = _completion(**request_params)
+
+        content_buffer = ""
+        reasoning_buffer = ""
+        tool_calls_map = {}
+        finish_reason = "stop"
+
+        for chunk in response:
+            if not chunk.choices:
+                continue
+
+            choice = chunk.choices[0]
+            delta = choice.delta
+
+            if not delta:
+                continue
+
+            if delta.content:
+                content_buffer += delta.content
+                if on_content:
+                    on_content(delta.content, False)
+
+            reasoning_delta = getattr(delta, "reasoning_content", None)
+            if reasoning_delta:
+                reasoning_buffer += reasoning_delta
+                if on_thinking:
+                    on_thinking(reasoning_delta, False)
+
+            if delta.tool_calls:
+                for tc_delta in delta.tool_calls:
+                    idx = getattr(tc_delta, "index", 0) or 0
+                    if idx not in tool_calls_map:
+                        tool_calls_map[idx] = {
+                            "id": getattr(tc_delta, "id", None) or _short_tool_id(),
+                            "name": "",
+                            "arguments": "",
+                        }
+                    func = getattr(tc_delta, "function", None)
+                    if func:
+                        if getattr(func, "name", None):
+                            tool_calls_map[idx]["name"] += func.name
+                        if getattr(func, "arguments", None):
+                            tool_calls_map[idx]["arguments"] += func.arguments
+
+            if choice.finish_reason:
+                finish_reason = choice.finish_reason
+
+        if content_buffer and on_content:
+            on_content("", True)
+        if reasoning_buffer and on_thinking:
+            on_thinking("", True)
+
+        tool_calls = []
+        for idx in sorted(tool_calls_map.keys()):
+            tc = tool_calls_map[idx]
+            args = tc["arguments"]
+            if isinstance(args, str):
+                args = json_repair.loads(args)
+            tool_calls.append(
+                {
+                    "id": tc["id"],
+                    "name": tc["name"],
+                    "arguments": args,
+                }
+            )
+
+        return {
+            "content": content_buffer,
+            "tool_calls": tool_calls,
+            "reasoning_content": reasoning_buffer or None,
+            "finish_reason": finish_reason,
+        }
+
     def chat(
         self,
         messages: list[dict],
@@ -462,14 +576,15 @@ class AIClient:
         images=None,
     ) -> str:
         """
-        非流式聊天，支持多轮工具调用
+        流式聊天，支持多轮工具调用
+        content/reasoning 实时流式输出，tool_calls 在每轮流结束后统一处理
 
         Args:
             messages: 消息列表
-            on_thinking: 思考内容回调
-            on_content: 内容回调
-            on_tool_call: 工具调用回调
-            on_error: 错误回调
+            on_thinking: 思考内容回调 (text, is_end)
+            on_content: 内容回调 (text, is_end)
+            on_tool_call: 工具调用回调 (tool_name, params, result)
+            on_error: 错误回调 (error_msg)
             images: 图片列表（仅视觉模型支持）
 
         Returns:
@@ -499,7 +614,6 @@ class AIClient:
             iteration += 1
 
             try:
-                # 如果是视觉模型，处理消息中的图片
                 if self.is_vision_model:
                     processed_full_messages = self._process_vision_messages(
                         full_messages, images
@@ -507,7 +621,12 @@ class AIClient:
                 else:
                     processed_full_messages = self._sanitize_messages(full_messages)
 
-                response = self._chat(processed_full_messages, use_tools=True)
+                response = self._chat_stream(
+                    processed_full_messages,
+                    use_tools=True,
+                    on_thinking=on_thinking,
+                    on_content=on_content,
+                )
             except _litellm.AuthenticationError as e:
                 error_msg = "API认证失败: %s" % str(e)
                 logger.logger.error(logger.ERRORS, error_msg)
@@ -536,12 +655,6 @@ class AIClient:
             content = response["content"] or ""
             tool_calls = response["tool_calls"]
             reasoning_content = response["reasoning_content"]
-
-            if reasoning_content and on_thinking:
-                on_thinking(reasoning_content, True)
-
-            if content and on_content:
-                on_content(content, True)
 
             if not tool_calls:
                 final_content = content

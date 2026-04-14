@@ -2408,7 +2408,7 @@ class AIAssistantDialog(QtWidgets.QDialog):
         request_data = {
             "model": cfg.get("model"),
             "messages": history_messages,
-            "stream": False,
+            "stream": True,
             "tools": "enabled",
         }
         logger.logger.info(logger.AI_REQUEST, "发送到AI服务器的请求", request_data)
@@ -2516,7 +2516,7 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
 
 class AIStreamWorker(QtCore.QThread):
-    """AI请求工作线程 - 非流式调用"""
+    """AI请求工作线程 - 流式输出 + 非流式工具调用"""
 
     thinking_signal = QtCore.Signal(str, bool)
     content_signal = QtCore.Signal(str, bool)
