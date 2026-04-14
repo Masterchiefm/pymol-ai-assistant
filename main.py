@@ -127,11 +127,23 @@ class StyledButton(QtWidgets.QPushButton):
 class MessageWidget(QtWidgets.QFrame):
     """单条消息组件"""
 
-    def __init__(self, role, content, images=None, parent=None):
+    def __init__(
+        self,
+        role,
+        content,
+        images=None,
+        parent=None,
+        tool_params=None,
+        tool_name=None,
+        tool_result=None,
+    ):
         super().__init__(parent)
         self.role = role
         self.raw_content = content
         self.images = images or []
+        self.tool_params = tool_params
+        self.tool_name = tool_name
+        self.tool_result = tool_result
         self.setObjectName("messageWidget")
         self.setup_ui()
         self.set_content(content, self.images)
@@ -207,6 +219,22 @@ class MessageWidget(QtWidgets.QFrame):
         """)
         layout.addWidget(self.content_label)
 
+        if self.role in ["tool", "tool_result", "tool_error"]:
+            self._create_collapsible_section(
+                layout,
+                "params",
+                i18n._("show_params"),
+                i18n._("hide_params"),
+                self.tool_params,
+            )
+            self._create_collapsible_section(
+                layout,
+                "result",
+                i18n._("show_result"),
+                i18n._("hide_result"),
+                self.tool_result,
+            )
+
         # 设置背景 - 使用palette而不是stylesheet
         self.setStyleSheet(
             """
@@ -268,6 +296,54 @@ class MessageWidget(QtWidgets.QFrame):
             self.image_layout.addWidget(label)
 
         self.image_container.setVisible(bool(self.images))
+
+    def _create_collapsible_section(
+        self, parent_layout, key, show_text, hide_text, data
+    ):
+        if data is None:
+            return
+        container = QtWidgets.QWidget()
+        container_layout = QtWidgets.QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 4, 0, 0)
+        container_layout.setSpacing(2)
+
+        toggle = QtWidgets.QLabel("▶ %s" % show_text)
+        toggle.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        toggle.setStyleSheet(
+            "color: #999999; font-size: 12px; background: transparent;"
+        )
+        container_layout.addWidget(toggle)
+
+        detail = QtWidgets.QLabel()
+        detail.setWordWrap(True)
+        detail.setTextFormat(QtCore.Qt.PlainText)
+        detail.setTextInteractionFlags(
+            QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard
+        )
+        detail.setCursor(QtGui.QCursor(QtCore.Qt.IBeamCursor))
+        detail.setStyleSheet(
+            "color: #888888; font-size: 12px; background: transparent; padding: 4px 8px; border: 1px solid #444444; border-radius: 4px;"
+        )
+        detail.hide()
+        container_layout.addWidget(detail)
+
+        if isinstance(data, (dict, list)):
+            detail.setText(json.dumps(data, ensure_ascii=False, indent=2))
+        else:
+            detail.setText(str(data))
+
+        def _on_toggle(
+            event, _toggle=toggle, _detail=detail, _show=show_text, _hide=hide_text
+        ):
+            if _detail.isVisible():
+                _detail.hide()
+                _toggle.setText("▶ %s" % _show)
+            else:
+                _detail.show()
+                _toggle.setText("▼ %s" % _hide)
+
+        toggle.mousePressEvent = _on_toggle
+        parent_layout.addWidget(container)
 
     def _format_text(self, text):
         """格式化普通文本，支持不同颜色的文本"""
@@ -670,9 +746,24 @@ class ChatWidget(QtWidgets.QWidget):
         self.loading_timer.stop()
         self.loading_indicator.hide()
 
-    def add_message(self, role, content, images=None):
+    def add_message(
+        self,
+        role,
+        content,
+        images=None,
+        tool_params=None,
+        tool_name=None,
+        tool_result=None,
+    ):
         """添加消息 - 插入到加载指示器之前"""
-        msg_widget = MessageWidget(role, content, images)
+        msg_widget = MessageWidget(
+            role,
+            content,
+            images,
+            tool_params=tool_params,
+            tool_name=tool_name,
+            tool_result=tool_result,
+        )
         # 插入到倒数第二个位置（加载指示器之前）
         insert_pos = self.messages_layout.count() - 2
         if insert_pos < 0:
@@ -2040,8 +2131,15 @@ class AIAssistantDialog(QtWidgets.QDialog):
         """安装更新"""
         from PyQt5.QtWidgets import QMessageBox, QProgressDialog
         from PyQt5.QtCore import Qt
+        import os
 
         is_en = i18n.get_language() == "en"
+
+        dep_ok_file = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "dependence_ok"
+        )
+        if os.path.exists(dep_ok_file):
+            os.remove(dep_ok_file)
 
         # 创建进度对话框
         progress = QProgressDialog(dialog)
@@ -2358,41 +2456,43 @@ class AIAssistantDialog(QtWidgets.QDialog):
             self.chat_widget.append_to_current(text)
 
     def on_tool_call(self, tool_name, params, result):
-        # 只处理有结果的情况，避免重复显示
-        if result is not None:
-            # 如果是截图工具且返回了图片，显示图片
-            if (
-                tool_name == "pymol_capture_view"
-                and result.get("success")
-                and result.get("image_data")
-            ):
-                import base64
-                from pymol.Qt import QtGui
+        if result is None:
+            return
 
-                image_data = result.get("image_data")
-                img_bytes = base64.b64decode(image_data)
-                pixmap = QtGui.QPixmap()
-                pixmap.loadFromData(img_bytes)
+        if (
+            tool_name == "pymol_capture_view"
+            and result.get("success")
+            and result.get("image_data")
+        ):
+            import base64
+            from pymol.Qt import QtGui
 
-                if not pixmap.isNull():
-                    # 显示工具调用和截图
-                    self.chat_widget.add_message(
-                        "tool",
-                        "使用工具: %s\n参数: %s\n结果: %s"
-                        % (tool_name, params, result.get("message")),
-                        images=[{"pixmap": pixmap, "preview": pixmap}],
-                    )
-                else:
-                    self.chat_widget.add_message(
-                        "tool",
-                        "使用工具: %s\n参数: %s\n结果: %s"
-                        % (tool_name, params, result),
-                    )
-            else:
+            image_data = result.get("image_data")
+            img_bytes = base64.b64decode(image_data)
+            pixmap = QtGui.QPixmap()
+            pixmap.loadFromData(img_bytes)
+
+            if not pixmap.isNull():
                 self.chat_widget.add_message(
                     "tool",
-                    "使用工具: %s\n参数: %s\n结果: %s" % (tool_name, params, result),
+                    "使用工具: %s" % tool_name,
+                    images=[{"pixmap": pixmap, "preview": pixmap}],
+                    tool_params=params,
+                    tool_name=tool_name,
+                    tool_result=result.get("message"),
                 )
+                return
+
+        result_text = (
+            result if isinstance(result, str) else result.get("message", str(result))
+        )
+        self.chat_widget.add_message(
+            "tool",
+            "使用工具: %s" % tool_name,
+            tool_params=params,
+            tool_name=tool_name,
+            tool_result=result_text,
+        )
 
     def on_error(self, error_msg):
         # 记录错误到日志

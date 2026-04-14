@@ -15,7 +15,6 @@ from __future__ import print_function
 import sys
 import os
 
-import time as _time
 
 # 版本号
 __version__ = "3.0.4"
@@ -28,8 +27,15 @@ if PLUGIN_DIR not in sys.path:
     sys.path.insert(0, PLUGIN_DIR)
 
 
+DEPENDENCE_OK_FILE = os.path.join(PLUGIN_DIR, "dependence_ok")
+
+
 def check_and_install_dependencies():
-    """检查并安装依赖"""
+    """检查并安装依赖，安装成功后在插件目录创建dependence_ok标记文件"""
+    if os.path.exists(DEPENDENCE_OK_FILE):
+        print("[PyMOL AI Assistant] 依赖已安装，跳过检查")
+        return
+
     import subprocess
 
     python_executable = sys.executable
@@ -52,30 +58,37 @@ def check_and_install_dependencies():
         print(
             "[PyMOL AI Assistant] 正在安装依赖: {}".format(", ".join(missing_packages))
         )
-        try:
-            subprocess.check_call(
-                [
-                    python_executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "-i",
-                    "http://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple",
-                    "--trusted-host",
-                    "mirrors.tuna.tsinghua.edu.cn",
-                    "--user",
-                    "--quiet",
-                ]
-                + missing_packages
-            )
-            print("[PyMOL AI Assistant] 依赖安装成功！")
-        except Exception as e:
-            print("[PyMOL AI Assistant] 依赖安装失败: {}".format(e))
-            print(
-                "[PyMOL AI Assistant] 请手动安装: pip install {}".format(
-                    " ".join(missing_packages)
+        for attempt in range(1, 3):
+            try:
+                subprocess.check_call(
+                    [
+                        python_executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        "-i",
+                        "http://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple",
+                        "--trusted-host",
+                        "mirrors.tuna.tsinghua.edu.cn",
+                        "--user",
+                        "--quiet",
+                    ]
+                    + missing_packages
                 )
+                print("[PyMOL AI Assistant] 依赖安装成功！")
+                open(DEPENDENCE_OK_FILE, "w").close()
+                return
+            except Exception as e:
+                print(
+                    "[PyMOL AI Assistant] 依赖安装失败 (第{}次): {}".format(attempt, e)
+                )
+        print(
+            "[PyMOL AI Assistant] 依赖安装两次均失败，请手动安装: pip install {}".format(
+                " ".join(missing_packages)
             )
+        )
+    else:
+        open(DEPENDENCE_OK_FILE, "w").close()
 
 
 # 全局变量存储更新信息
@@ -146,17 +159,10 @@ def get_update_info():
 
 
 # 在后台检查依赖（不阻塞启动）
-_t0 = _time.time()
 import threading as _threading
 
 _dep_thread = _threading.Thread(target=check_and_install_dependencies, daemon=True)
 _dep_thread.start()
-_t1 = _time.time()
-print(
-    "[PyMOL AI Assistant] [耗时] check_and_install_dependencies (后台): {:.3f}s".format(
-        _t1 - _t0
-    )
-)
 
 # 检查更新（后台线程）
 check_update()
@@ -169,68 +175,15 @@ def show_dialog():
     """显示AI助手对话框"""
     global _dialog_instance
 
-    import time as _time
-
-    _t0 = _time.time()
-
     from pymol.Qt import QtWidgets
-
-    _t1 = _time.time()
-    print("[PyMOL AI Assistant] [耗时] import pymol.Qt: {:.3f}s".format(_t1 - _t0))
-
     from . import i18n
-
-    _t2 = _time.time()
-    print("[PyMOL AI Assistant] [耗时] import i18n: {:.3f}s".format(_t2 - _t1))
-
     from . import config
-
-    _t3 = _time.time()
-    print("[PyMOL AI Assistant] [耗时] import config: {:.3f}s".format(_t3 - _t2))
-
     from . import logger
-
-    _t4 = _time.time()
-    print("[PyMOL AI Assistant] [耗时] import logger: {:.3f}s".format(_t4 - _t3))
-
-    _t_pre_litellm = _time.time()
     from . import ai_client
-
-    _t5 = _time.time()
-    print(
-        "[PyMOL AI Assistant] [耗时] import ai_client (含 litellm): {:.3f}s".format(
-            _t5 - _t_pre_litellm
-        )
-    )
-
     from . import tools
-
-    _t6 = _time.time()
-    print(
-        "[PyMOL AI Assistant] [耗时] import tools (含 pymol.cmd): {:.3f}s".format(
-            _t6 - _t5
-        )
-    )
-
     from . import markdown_renderer
-
-    _t7 = _time.time()
-    print(
-        "[PyMOL AI Assistant] [耗时] import markdown_renderer: {:.3f}s".format(
-            _t7 - _t6
-        )
-    )
-
     from . import updater
-
-    _t8 = _time.time()
-    print("[PyMOL AI Assistant] [耗时] import updater: {:.3f}s".format(_t8 - _t7))
-
     from .main import AIAssistantDialog
-
-    _t9 = _time.time()
-    print("[PyMOL AI Assistant] [耗时] import main: {:.3f}s".format(_t9 - _t8))
-    print("[PyMOL AI Assistant] [耗时] 全部导入总计: {:.3f}s".format(_t9 - _t0))
 
     # 获取PyMOL主窗口作为父窗口
     app = QtWidgets.QApplication.instance()
@@ -255,26 +208,14 @@ def show_dialog():
             _dialog_instance = None
 
     # 创建新对话框
-    _t_create = _time.time()
     _dialog_instance = AIAssistantDialog(parent)
-    _t_done = _time.time()
-    print("[PyMOL AI Assistant] [耗时] 创建对话框: {:.3f}s".format(_t_done - _t_create))
-    print("[PyMOL AI Assistant] [耗时] show_dialog 总计: {:.3f}s".format(_t_done - _t0))
 
     _dialog_instance.show()
 
 
 def __init_plugin__(app=None):
     """初始化插件 - PyMOL会调用这个函数"""
-    _t0 = _time.time()
     from pymol.plugins import addmenuitemqt
-
-    _t1 = _time.time()
-    print(
-        "[PyMOL AI Assistant] [耗时] __init_plugin__ import pymol.plugins: {:.3f}s".format(
-            _t1 - _t0
-        )
-    )
 
     addmenuitemqt("AI Assistant / AI助手", show_dialog)
 
