@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-'''
+"""
 AI客户端模块 - 使用LiteLLM，非流式调用
 LiteLLM提供统一的API接口，支持100+LLM提供商
-'''
+"""
 
 import hashlib
 import json
@@ -11,13 +11,28 @@ import string
 from typing import Any
 
 import json_repair
-import litellm
-litellm.drop_params = True
-litellm.suppress_debug_info = True
-litellm.set_verbose = False
-litellm.cost_per_token = {}
-from litellm import completion
 from . import config, tools, logger
+
+_litellm = None
+_completion = None
+_litellm_initialized = False
+
+
+def _ensure_litellm():
+    global _litellm, _completion, _litellm_initialized
+    if _litellm_initialized:
+        return
+    import litellm as _ll
+
+    _litellm = _ll
+    _completion = _ll.completion
+    _ll.drop_params = True
+    _ll.suppress_debug_info = True
+    _ll.set_verbose = False
+    _ll.cost_per_token = {}
+    _ll.telemetry = False
+    _litellm_initialized = True
+
 
 _ALNUM = string.ascii_letters + string.digits
 
@@ -48,47 +63,58 @@ class AIClient:
         self.is_reasoning_model = False
         self.is_vision_model = False
         self.temperature = 0.7
-        self.max_tokens = 4096
+        self.max_tokens = 200000
         self.timeout = 60
         self.max_iterations = 40
 
     def set_config(self, api_config):
         """设置API配置"""
-        self.provider = api_config.get('provider', 'custom')
-        self.api_url = api_config.get('api_url', '')
-        self.api_key = api_config.get('api_key', '')
-        self.model = api_config.get('model', '')
-        self.api_version = api_config.get('api_version', '')
-        self.is_reasoning_model = api_config.get('is_reasoning_model', False)
-        self.is_vision_model = api_config.get('is_vision_model', False)
-        self.temperature = api_config.get('temperature', 0.7)
-        self.max_tokens = api_config.get('max_tokens', 4096)
-        self.timeout = api_config.get('timeout', 60)
+        self.provider = api_config.get("provider", "custom")
+        self.api_url = api_config.get("api_url", "")
+        self.api_key = api_config.get("api_key", "")
+        self.model = api_config.get("model", "")
+        self.api_version = api_config.get("api_version", "")
+        self.is_reasoning_model = api_config.get("is_reasoning_model", False)
+        self.is_vision_model = api_config.get("is_vision_model", False)
+        self.temperature = api_config.get("temperature", 0.7)
+        self.max_tokens = api_config.get("max_tokens", 200000)
+        self.timeout = api_config.get("timeout", 60)
 
     def _get_model_name(self):
         """获取LiteLLM格式的模型名称"""
         if not self.model:
             return None
-        
+
         provider_info = config.get_provider_info(self.provider)
-        prefix = provider_info.get('prefix', 'openai/')
-        
+        prefix = provider_info.get("prefix", "openai/")
+
         if self.model.startswith(prefix):
             return self.model
-        
-        known_prefixes = ['openai/', 'azure/', 'anthropic/', 'gemini/', 
-                          'ollama/', 'zhipu/', 'openrouter/', 'together_ai/',
-                          'huggingface/', 'bedrock/', 'vertex_ai/', 'groq/']
+
+        known_prefixes = [
+            "openai/",
+            "azure/",
+            "anthropic/",
+            "gemini/",
+            "ollama/",
+            "zhipu/",
+            "openrouter/",
+            "together_ai/",
+            "huggingface/",
+            "bedrock/",
+            "vertex_ai/",
+            "groq/",
+        ]
         for known_prefix in known_prefixes:
             if self.model.startswith(known_prefix):
                 return self.model
-        
+
         return f"{prefix}{self.model}"
 
     def _get_system_prompt(self):
         """
         获取系统提示词
-        
+
         美化与渲染风格参考来源：
         - https://zhuanlan.zhihu.com/p/530533107 (PyMOL绘图进阶)
         - https://pymolwiki.org/index.php/Gallery (PyMOL Wiki Gallery)
@@ -214,16 +240,16 @@ class AIClient:
     def _sanitize_messages(self, messages: list[dict]) -> list[dict]:
         """清理消息格式，标准化 tool_call_id"""
         id_map: dict[str, str] = {}
-        
+
         def map_id(value: Any) -> Any:
             if not isinstance(value, str):
                 return value
             return id_map.setdefault(value, _normalize_tool_call_id(value))
-        
+
         sanitized = []
         for msg in messages:
             clean = dict(msg)
-            
+
             if isinstance(clean.get("tool_calls"), list):
                 normalized_tool_calls = []
                 for tc in clean["tool_calls"]:
@@ -234,18 +260,18 @@ class AIClient:
                     tc_clean["id"] = map_id(tc_clean.get("id"))
                     normalized_tool_calls.append(tc_clean)
                 clean["tool_calls"] = normalized_tool_calls
-            
+
             if "tool_call_id" in clean and clean["tool_call_id"]:
                 clean["tool_call_id"] = map_id(clean["tool_call_id"])
-            
+
             sanitized.append(clean)
-        
+
         return sanitized
 
     def _chat(self, messages: list[dict], use_tools: bool = True, images=None) -> dict:
         """
         发送非流式聊天请求
-        
+
         Returns:
             dict: {
                 'content': str,
@@ -254,128 +280,138 @@ class AIClient:
                 'finish_reason': str
             }
         """
+        _ensure_litellm()
         model_name = self._get_model_name()
-        
+
         # 处理视觉模型的图片输入
         if images and self.is_vision_model:
             # 修改最后一条用户消息以包含图片
             processed_messages = self._process_vision_messages(messages, images)
         else:
             processed_messages = self._sanitize_messages(messages)
-        
+
         request_params = {
-            'model': model_name,
-            'messages': processed_messages,
-            'temperature': self.temperature,
-            'max_tokens': max(1, self.max_tokens),
-            'timeout': self.timeout,
+            "model": model_name,
+            "messages": processed_messages,
+            "temperature": self.temperature,
+            "max_tokens": max(1, self.max_tokens),
+            "timeout": self.timeout,
         }
 
         if self.api_key:
-            request_params['api_key'] = self.api_key
+            request_params["api_key"] = self.api_key
 
         if self.api_url:
-            request_params['api_base'] = self.api_url
+            request_params["api_base"] = self.api_url
 
-        if self.provider == 'azure' and self.api_version:
-            request_params['api_version'] = self.api_version
+        if self.provider == "azure" and self.api_version:
+            request_params["api_version"] = self.api_version
 
         # 工具调用：普通模型和视觉模型都支持工具调用
         if use_tools:
-            request_params['tools'] = tools.get_tool_definitions(self.is_vision_model)
-            request_params['tool_choice'] = 'auto'
+            request_params["tools"] = tools.get_tool_definitions(self.is_vision_model)
+            request_params["tool_choice"] = "auto"
 
         logger.logger.debug(
             logger.AI_REQUEST,
             "发送AI请求",
-            {"provider": self.provider, "model": self.model, "has_images": bool(images)}
+            {
+                "provider": self.provider,
+                "model": self.model,
+                "has_images": bool(images),
+            },
         )
 
-        response = completion(**request_params)
+        response = _completion(**request_params)
         return self._parse_response(response)
-    
+
     def _process_vision_messages(self, messages: list[dict], images: list) -> list:
         """
         处理视觉模型的消息格式
-        
+
         Args:
             messages: 原始消息列表
             images: 图片数据列表
-            
+
         Returns:
             list: 处理后的消息列表，最后一条用户消息包含图片
         """
         processed = []
         import base64
-        
+
         for msg in messages:
             processed_msg = dict(msg)
-            
+
             # 如果是最后一条用户消息且有图片，转换格式
-            if msg.get('role') == 'user' and images:
+            if msg.get("role") == "user" and images:
                 content_list = []
-                
+
                 # 添加文本内容
-                if msg.get('content'):
-                    content_list.append({
-                        "type": "text",
-                        "text": msg.get('content')
-                    })
-                
+                if msg.get("content"):
+                    content_list.append({"type": "text", "text": msg.get("content")})
+
                 # 添加图片
                 for img_data in images:
                     # 将图片数据转换为base64
-                    img_bytes = img_data.get('data')
+                    img_bytes = img_data.get("data")
                     if img_bytes:
                         # img_bytes 现在是 bytes 类型，直接编码为 base64
-                        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
-                        
-                        content_list.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{img_base64}"
+                        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+
+                        content_list.append(
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{img_base64}"
+                                },
                             }
-                        })
-                
+                        )
+
                 if content_list:
-                    processed_msg['content'] = content_list
-            
+                    processed_msg["content"] = content_list
+
             # 处理工具返回的图片（pymol_capture_view）
             # 工具消息的content必须是字符串，所以我们需要在工具消息后添加一个用户消息来传递图片
-            elif msg.get('role') == 'tool' and msg.get('content'):
+            elif msg.get("role") == "tool" and msg.get("content"):
                 try:
-                    content = msg.get('content')
+                    content = msg.get("content")
                     if isinstance(content, str):
                         try:
                             tool_result = json.loads(content)
-                            if tool_result.get('has_image') and tool_result.get('image_url'):
+                            if tool_result.get("has_image") and tool_result.get(
+                                "image_url"
+                            ):
                                 # 先添加工具消息（字符串格式）
-                                processed_msg['content'] = tool_result.get('message', '截图成功')
+                                processed_msg["content"] = tool_result.get(
+                                    "message", "截图成功"
+                                )
                                 processed.append(processed_msg)
                                 # 然后添加一个用户消息包含图片
-                                processed.append({
-                                    'role': 'user',
-                                    'content': [
-                                        {
-                                            "type": "text",
-                                            "text": "这是刚才捕获的PyMOL视图截图："
-                                        },
-                                        {
-                                            "type": "image_url",
-                                            "image_url": {
-                                                "url": tool_result.get('image_url')
-                                            }
-                                        }
-                                    ]
-                                })
+                                processed.append(
+                                    {
+                                        "role": "user",
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": "这是刚才捕获的PyMOL视图截图：",
+                                            },
+                                            {
+                                                "type": "image_url",
+                                                "image_url": {
+                                                    "url": tool_result.get("image_url")
+                                                },
+                                            },
+                                        ],
+                                    }
+                                )
                                 continue
                         except json.JSONDecodeError:
                             pass
                 except:
                     pass
-            
+
             processed.append(processed_msg)
-        
+
         return self._sanitize_messages(processed)
 
     def _parse_response(self, response) -> dict:
@@ -398,20 +434,22 @@ class AIClient:
             args = tc.function.arguments
             if isinstance(args, str):
                 args = json_repair.loads(args)
-            
-            tool_calls.append({
-                'id': _short_tool_id(),
-                'name': tc.function.name,
-                'arguments': args,
-            })
+
+            tool_calls.append(
+                {
+                    "id": _short_tool_id(),
+                    "name": tc.function.name,
+                    "arguments": args,
+                }
+            )
 
         reasoning_content = getattr(message, "reasoning_content", None) or None
 
         return {
-            'content': content,
-            'tool_calls': tool_calls,
-            'reasoning_content': reasoning_content,
-            'finish_reason': finish_reason,
+            "content": content,
+            "tool_calls": tool_calls,
+            "reasoning_content": reasoning_content,
+            "finish_reason": finish_reason,
         }
 
     def chat(
@@ -438,20 +476,20 @@ class AIClient:
             str: 最终响应内容
         """
         provider_info = config.get_provider_info(self.provider)
-        requires_key = provider_info.get('requires_api_key', True)
-        
+        requires_key = provider_info.get("requires_api_key", True)
+
         if not self.model:
             if on_error:
                 on_error("请选择模型")
             return ""
-        
+
         if requires_key and not self.api_key:
             if on_error:
                 on_error("请输入 API Key")
             return ""
 
         full_messages = [
-            {'role': 'system', 'content': self._get_system_prompt()}
+            {"role": "system", "content": self._get_system_prompt()}
         ] + messages
 
         iteration = 0
@@ -463,24 +501,26 @@ class AIClient:
             try:
                 # 如果是视觉模型，处理消息中的图片
                 if self.is_vision_model:
-                    processed_full_messages = self._process_vision_messages(full_messages, images)
+                    processed_full_messages = self._process_vision_messages(
+                        full_messages, images
+                    )
                 else:
                     processed_full_messages = self._sanitize_messages(full_messages)
-                
+
                 response = self._chat(processed_full_messages, use_tools=True)
-            except litellm.AuthenticationError as e:
+            except _litellm.AuthenticationError as e:
                 error_msg = "API认证失败: %s" % str(e)
                 logger.logger.error(logger.ERRORS, error_msg)
                 if on_error:
                     on_error(error_msg)
                 return ""
-            except litellm.RateLimitError as e:
+            except _litellm.RateLimitError as e:
                 error_msg = "API速率限制: %s" % str(e)
                 logger.logger.error(logger.ERRORS, error_msg)
                 if on_error:
                     on_error(error_msg)
                 return ""
-            except litellm.APIError as e:
+            except _litellm.APIError as e:
                 error_msg = "API错误: %s" % str(e)
                 logger.logger.error(logger.ERRORS, error_msg)
                 if on_error:
@@ -493,9 +533,9 @@ class AIClient:
                     on_error(error_msg)
                 return ""
 
-            content = response['content'] or ""
-            tool_calls = response['tool_calls']
-            reasoning_content = response['reasoning_content']
+            content = response["content"] or ""
+            tool_calls = response["tool_calls"]
+            reasoning_content = response["reasoning_content"]
 
             if reasoning_content and on_thinking:
                 on_thinking(reasoning_content, True)
@@ -509,28 +549,32 @@ class AIClient:
 
             tool_call_dicts = []
             for tc in tool_calls:
-                tool_call_dicts.append({
-                    'id': tc['id'],
-                    'type': 'function',
-                    'function': {
-                        'name': tc['name'],
-                        'arguments': json.dumps(tc['arguments'], ensure_ascii=False),
+                tool_call_dicts.append(
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tc["name"],
+                            "arguments": json.dumps(
+                                tc["arguments"], ensure_ascii=False
+                            ),
+                        },
                     }
-                })
+                )
 
             assistant_msg = {
-                'role': 'assistant',
-                'content': content,
-                'tool_calls': tool_call_dicts,
+                "role": "assistant",
+                "content": content,
+                "tool_calls": tool_call_dicts,
             }
             if reasoning_content:
-                assistant_msg['reasoning_content'] = reasoning_content
-            
+                assistant_msg["reasoning_content"] = reasoning_content
+
             full_messages.append(assistant_msg)
 
             for tc in tool_calls:
-                tool_name = tc['name']
-                params = tc['arguments']
+                tool_name = tc["name"]
+                params = tc["arguments"]
                 arguments_str = json.dumps(params, ensure_ascii=False)
 
                 if on_tool_call:
@@ -541,82 +585,92 @@ class AIClient:
                 logger.logger.info(
                     logger.TOOL_CALL,
                     "工具执行: %s" % tool_name,
-                    {
-                        "tool": tool_name,
-                        "params": params,
-                        "result": result
-                    }
+                    {"tool": tool_name, "params": params, "result": result},
                 )
 
                 if on_tool_call:
                     on_tool_call(tool_name, arguments_str, result)
 
-                tool_response_content = result.get('message', '')
-                
-                if tool_name == 'pymol_capture_view' and result.get('success') and result.get('image_data'):
-                    image_base64 = result.get('image_data')
-                    tool_response_content = json.dumps({
-                        'message': result.get('message'),
-                        'has_image': True,
-                        'image_url': f'data:image/png;base64,{image_base64}',
-                        'width': result.get('width'),
-                        'height': result.get('height')
-                    }, ensure_ascii=False)
-                elif result.get('output'):
-                    tool_response_content = result.get('output')
-                elif result.get('data'):
-                    tool_response_content = json.dumps(result.get('data'), ensure_ascii=False)
+                tool_response_content = result.get("message", "")
+
+                if (
+                    tool_name == "pymol_capture_view"
+                    and result.get("success")
+                    and result.get("image_data")
+                ):
+                    image_base64 = result.get("image_data")
+                    tool_response_content = json.dumps(
+                        {
+                            "message": result.get("message"),
+                            "has_image": True,
+                            "image_url": f"data:image/png;base64,{image_base64}",
+                            "width": result.get("width"),
+                            "height": result.get("height"),
+                        },
+                        ensure_ascii=False,
+                    )
+                elif result.get("output"):
+                    tool_response_content = result.get("output")
+                elif result.get("data"):
+                    tool_response_content = json.dumps(
+                        result.get("data"), ensure_ascii=False
+                    )
                 elif not tool_response_content:
                     tool_response_content = json.dumps(result, ensure_ascii=False)
 
-                full_messages.append({
-                    'role': 'tool',
-                    'tool_call_id': tc['id'],
-                    'content': tool_response_content,
-                })
+                full_messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": tool_response_content,
+                    }
+                )
 
         if iteration >= self.max_iterations and not final_content:
-            final_content = "已达到最大迭代次数 (%d)，任务可能未完成。" % self.max_iterations
+            final_content = (
+                "已达到最大迭代次数 (%d)，任务可能未完成。" % self.max_iterations
+            )
 
         return final_content
 
     def test_connection(self):
         """测试连接"""
         try:
+            _ensure_litellm()
             provider_info = config.get_provider_info(self.provider)
-            requires_key = provider_info.get('requires_api_key', True)
-            
+            requires_key = provider_info.get("requires_api_key", True)
+
             if not self.model:
                 return False, "请选择模型"
-            
+
             if requires_key and not self.api_key:
                 return False, "请输入 API Key"
 
             model_name = self._get_model_name()
-            
+
             request_params = {
-                'model': model_name,
-                'messages': [{'role': 'user', 'content': 'hi'}],
-                'max_tokens': 5,
-                'timeout': 30,
+                "model": model_name,
+                "messages": [{"role": "user", "content": "hi"}],
+                "max_tokens": 5,
+                "timeout": 30,
             }
-            
+
             if self.api_key:
-                request_params['api_key'] = self.api_key
-            
+                request_params["api_key"] = self.api_key
+
             if self.api_url:
-                request_params['api_base'] = self.api_url
-            
-            if self.provider == 'azure' and self.api_version:
-                request_params['api_version'] = self.api_version
-            
-            response = completion(**request_params)
+                request_params["api_base"] = self.api_url
+
+            if self.provider == "azure" and self.api_version:
+                request_params["api_version"] = self.api_version
+
+            response = _completion(**request_params)
             return True, "连接成功"
-        except litellm.AuthenticationError as e:
+        except _litellm.AuthenticationError as e:
             return False, "认证失败: %s" % str(e)
-        except litellm.RateLimitError as e:
+        except _litellm.RateLimitError as e:
             return False, "速率限制: %s" % str(e)
-        except litellm.APIError as e:
+        except _litellm.APIError as e:
             return False, "API错误: %s" % str(e)
         except Exception as e:
             return False, str(e)

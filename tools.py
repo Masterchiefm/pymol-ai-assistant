@@ -14,37 +14,22 @@ import sys
 import tempfile
 from typing import Dict, List, Any, Optional, Callable
 from io import StringIO
-import litellm
 from . import logger
 
 
 def supports_function_calling(model: str) -> bool:
-    """
-    检查模型是否支持 Function Calling
-    
-    Args:
-        model: 模型名称
-        
-    Returns:
-        bool: 是否支持 Function Calling
-    """
     try:
+        import litellm
+
         return litellm.supports_function_calling(model=model)
     except Exception:
         return True
 
 
 def supports_parallel_function_calling(model: str) -> bool:
-    """
-    检查模型是否支持并行 Function Calling
-    
-    Args:
-        model: 模型名称
-        
-    Returns:
-        bool: 是否支持并行 Function Calling
-    """
     try:
+        import litellm
+
         return litellm.supports_parallel_function_calling(model=model)
     except Exception:
         return False
@@ -53,7 +38,7 @@ def supports_parallel_function_calling(model: str) -> bool:
 def get_tool_definitions(is_vision_model: bool = False) -> List[Dict[str, Any]]:
     """
     获取所有工具的定义（用于 OpenAI Function Calling）
-    
+
     Args:
         is_vision_model: 是否为视觉模型，如果是则包含截图工具
     """
@@ -68,16 +53,16 @@ def get_tool_definitions(is_vision_model: bool = False) -> List[Dict[str, Any]]:
                     "properties": {
                         "code": {
                             "type": "string",
-                            "description": "PDB ID，如 '1ake', '1abc'"
+                            "description": "PDB ID，如 '1ake', '1abc'",
                         },
                         "name": {
                             "type": "string",
-                            "description": "对象名称（可选，默认使用 PDB ID）"
-                        }
+                            "description": "对象名称（可选，默认使用 PDB ID）",
+                        },
                     },
-                    "required": ["code"]
-                }
-            }
+                    "required": ["code"],
+                },
+            },
         },
         {
             "type": "function",
@@ -89,38 +74,35 @@ def get_tool_definitions(is_vision_model: bool = False) -> List[Dict[str, Any]]:
                     "properties": {
                         "filename": {
                             "type": "string",
-                            "description": "文件路径，如 '/path/to/protein.pdb'"
+                            "description": "文件路径，如 '/path/to/protein.pdb'",
                         },
-                        "name": {
-                            "type": "string",
-                            "description": "对象名称（可选）"
-                        },
+                        "name": {"type": "string", "description": "对象名称（可选）"},
                         "format": {
                             "type": "string",
-                            "description": "文件格式（可选，如 'pdb', 'cif', 'mol2'，默认自动检测）"
-                        }
+                            "description": "文件格式（可选，如 'pdb', 'cif', 'mol2'，默认自动检测）",
+                        },
                     },
-                    "required": ["filename"]
-                }
-            }
+                    "required": ["filename"],
+                },
+            },
         },
         {
             "type": "function",
             "function": {
                 "name": "pymol_write_script",
-                "description": """在临时文件夹中创建脚本文件，支持 Python (.py) 和 PyMOL 命令脚本 (.pml) 两种格式。
+                "description": """在系统临时文件夹中创建脚本文件，支持 Python (.py) 和 PyMOL 命令脚本 (.pml) 两种格式。创建后使用 pymol_run_script 执行。
 
 【脚本类型选择】
 1. Python 脚本 (.py):
    - 需要执行复杂的 PyMOL 操作
    - 需要使用 Python 的循环、条件判断等编程结构
    - 需要自定义函数进行批量处理
-   - 需要从脚本中返回计算结果给 AI
+   - 需要从脚本中返回计算结果给 AI（通过 print 输出）
 
 2. PyMOL 命令脚本 (.pml):
-   - 快速执行一系列 PyMOL 命令
+   - 快速执行一系列 PyMOL 命令，每行一条命令
    - 不需要复杂的逻辑控制
-   - 简单的加载、显示、着色操作
+   - 适合简单的加载、显示、着色、渲染操作
 
 【Python 脚本示例】
 ```python
@@ -130,9 +112,8 @@ from pymol import cmd, stored
 stored.ca_coords = []
 cmd.iterate("name CA", "stored.ca_coords.append([x,y,z])")
 
-# 输出结果
+# 输出结果（print 内容会被捕获返回）
 print(f"共有 {len(stored.ca_coords)} 个CA原子")
-print("坐标列表:")
 for i, coord in enumerate(stored.ca_coords[:5]):
     print(f"  CA{i+1}: ({coord[0]:.2f}, {coord[1]:.2f}, {coord[2]:.2f})")
 
@@ -143,114 +124,181 @@ print(f"分子表面积: {area:.2f} Å²")
 
 【PyMOL 命令脚本 (.pml) 示例】
 ```pml
-# 加载结构
 fetch 1ake, protein
-
-# 显示卡通表示
 show cartoon
-
-# 按链着色
 color red, chain A
 color blue, chain B
-
-# 计算二级结构
 dss
-
-# 缩放
 zoom
 ```
 
-【pml 命令参考】
-- load [文件名], [对象名], [格式] - 加载本地文件
-- fetch [PDB码], [对象名] - 从PDB数据库下载结构
-- show [表示形式], [选择] - 显示表示形式（cartoon, sticks, surface等）
-- hide [表示形式], [选择] - 隐藏表示形式
-- color [颜色], [选择] - 设置颜色（支持 rainbow, by_chain, by_ss 等特殊模式）
+【pml 命令完整参考】
+文件加载:
+- load [文件路径], [对象名], [格式] - 加载本地结构文件（支持 pdb, cif, mol2, sdf, ent 等）
+- fetch [PDB码], [对象名] - 从 RCSB PDB 数据库下载结构
+- run [脚本.py] - 运行 Python 脚本（等同于 pymol_run_script）
+- @ [脚本.pml] - 运行 PyMOL 命令脚本
+
+显示控制:
+- show [表示], [选择] - 显示表示形式。表示: lines, sticks, spheres, surface, mesh, ribbon, cartoon, dots, labels, nonbonded, slice, extent
+- hide [表示], [选择] - 隐藏表示形式
+- enable [对象名] - 启用对象
+- disable [对象名] - 禁用对象
+- as [表示], [选择] - 设置对象的默认显示方式
+
+颜色设置:
+- color [颜色], [选择] - 设置颜色。标准色: red, green, blue, yellow, cyan, magenta, white, black, orange, salmon, lime 等。特殊模式: rainbow, by_chain, by_ss, by_resi, by_b, by_element, atomic
+- set_color [名称], [R值, G值, B值] - 定义自定义颜色（RGB 范围 0.0-1.0）
 - bg_color [颜色] - 设置背景颜色
-- zoom [选择], [缓冲] - 缩放视图
+- spectrum [属性], [渐变色], [选择] - 按属性渐变着色（如 spectrum b, blue_red, all）
+- util.cbc [选择] - 按链着色
+- ss [选择] - 按二级结构着色（H=螺旋=黄, S=折叠=蓝, ''=环=白）
+
+视图控制:
+- zoom [选择], [缓冲] - 缩放（缓冲单位为埃）
 - center [选择] - 将视图中心移动到指定选择
-- select [名称], [选择表达式] - 创建选择集
-- distance/angle/dihedral - 测量距离、角度、二面角
+- reset - 重置视图
+- orient - 沿主轴对齐结构
+- clip [near], [far] - 设置裁剪平面
+- origin [选择] - 设置旋转中心
+
+旋转和平移:
+- rotate [轴], [角度], [选择] - 旋转（轴: x, y, z）
+- turn [轴], [角度] - 旋转相机
+- move [x], [y], [z], [选择] - 平移原子
+- translate [x], [y], [z] - 平移相机
+
+选择操作:
+- select [名称], [选择表达式] - 创建命名选择集
+- deselect - 取消所有选择
+- remove [名称] - 删除对象或选择集
+- 选择表达式语法: chain [链ID], resi [残基号范围], resn [残基名], name [原子名], elem [元素], byres(选择), bychain(选择), within [距离] of (选择), (选择) and/or/not (选择)
+- 举例: chain A and resi 50-100, name CA, resn HEM, within 5 of chain B
+
+测量:
+- distance [名称], [选择1], [选择2] - 测量距离
+- angle [名称], [选择1], [选择2], [选择3] - 测量角度
+- dihedral [名称], [选择1], [选择2], [选择3], [选择4] - 测量二面角
+- dist_count [选择1], [选择2], [截止距离] - 统计接触原子对数
+
+标签和标注:
+- label [选择], "[表达式]" - 添加标签。占位符: %s残基名, %i残基号, %n原子名, %r残基, %a元素, %b B因子, %ID原子ID, %chain链, %q占据率, %e热因子
+- pseudoatom [名称], [选择] - 创建伪原子
+- h_add [选择] - 添加氢原子
+- remove_h [选择] - 删除氢原子
+
+渲染和图像:
 - ray [宽], [高] - 光线追踪渲染
-- png [文件名], [dpi], [ray] - 保存PNG图像
-- set [参数], [值] - 设置 PyMOL 参数
+- png [文件名], [dpi], [ray] - 保存 PNG 图像（ray=1 会先做光线追踪）
+- set ray_trace_mode, [0|1] - 0=普通, 1=扁平莫兰迪风格
+- set ray_shadow, [0|1] - 开关阴影
+- set ambient, [值] - 环境光强度（0-1，默认 0.15）
+- set ray_trace_disco_factor, [值] - 阴影散射因子
+- set ray_trace_gain, [值] - 增益
+- set antialias, [0|1|2] - 抗锯齿级别
+- set opaque_background, [0|1] - 背景透明（用于 PNG）
+
+参数设置:
+- set [参数], [值], [选择] - 设置 PyMOL 参数
+- set cartoon_cylindrical_helices, on - 圆柱形螺旋
+- set cartoon_loop_radius, [值] - 环半径
+- set cartoon_oval_width, [值] - 螺旋椭圆宽度
+- set transparency, [值] - 透明度（0-1）
+- set cartoon_side_chain_helper, [1|0] - 显示侧链辅助线
+- set sphere_scale, [值] - 球体缩放
+- set stick_radius, [值] - 棍模型半径
+- set line_width, [值] - 线宽
+- set label_size, [值] - 标签字号
+- set defer_updates, [0|1] - 延迟更新（批量操作时设为1加速）
+- set valence, [0|1] - 显示化学键价态
+- set mesh_width, [值] - 网格宽度
+
+表面相关:
+- set surface_quality, [0|1] - 表面质量
+- set solvent_radius, [值] - 溶剂探针半径
+- get_area - 计算表面积
+- isosurface [名称], [地图], [阈值] - 等值面
+
+状态和动画:
+- mset [状态范围] - 定义动画状态序列（如 mset 1 x100）
+- mplay / mstop - 播放/停止动画
+- frame [帧号] - 跳到指定帧
+
+对象操作:
+- create [新对象], [源选择] - 从选择创建新对象
+- copy [目标], [源] - 复制对象
+- split_states [对象] - 按状态拆分对象
+- orient [选择] - 沿主轴对齐
+- symexp [名称], [来源], [切割], [距离] - 对称扩展
+- map_generate [名称], [选择], [分辨率] - 生成电子密度图
 
 【注意事项】
-- 脚本保存到临时文件夹，文件名包含时间戳
+- 脚本保存到系统临时文件夹，文件名包含时间戳
 - Python 脚本中的 print 输出会被捕获并返回给 AI
-- pml 脚本使用 cmd.do() 执行，输出也会被捕获
-- 使用 pymol_run_script 来执行创建的脚本""",
+- .pml 脚本中每行一条命令，# 为注释
+- .pml 文件不支持变量、循环、条件判断等编程结构
+- 创建脚本后必须使用 pymol_run_script 来执行""",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "code": {
-                            "type": "string",
-                            "description": "脚本代码内容"
-                        },
+                        "code": {"type": "string", "description": "脚本代码内容"},
                         "name": {
                             "type": "string",
-                            "description": "脚本名称（可选，用于标识，默认使用时间戳）"
+                            "description": "脚本名称（可选，用于标识，默认使用时间戳）",
                         },
                         "script_type": {
                             "type": "string",
                             "description": "脚本类型: python (默认，Python脚本) 或 pml (PyMOL命令脚本)",
                             "enum": ["python", "pml"],
-                            "default": "python"
-                        }
+                            "default": "python",
+                        },
                     },
-                    "required": ["code"]
-                }
-            }
+                    "required": ["code"],
+                },
+            },
         },
         {
             "type": "function",
             "function": {
                 "name": "pymol_run_script",
-                "description": """执行 Python 脚本文件（.py 或 .pym）。
+                "description": """执行脚本文件（支持 .py、.pym、.pml 三种格式）。通常先用 pymol_write_script 创建脚本，再用本工具执行。
 
-【命名空间选项】
-- global (默认): 在 PyMOL 全局命名空间中运行
+【支持的文件类型】
+- .py / .pym: Python 脚本，在 PyMOL 命名空间中执行，可使用 cmd、stored 等
+- .pml: PyMOL 命令脚本，逐行执行每条 PyMOL 命令
+
+【Python 脚本命名空间选项】
+- global (默认): 在 PyMOL 全局命名空间中运行，可访问 cmd、stored 等
 - local: 在 PyMOL 局部命名空间中运行
 - main: 在 Python 主模块命名空间中运行
 - module: 作为独立 Python 模块运行
 - private: 私有命名空间，局部变量完全隔离
 
-【脚本输出捕获】
-脚本中的所有 print 输出都会被捕获并返回给 AI，让 AI 能够了解执行结果。
+【输出捕获】
+- Python 脚本中的 print 输出会被捕获并返回
+- .pml 脚本中 PyMOL 的反馈信息会被捕获并返回
+- 执行结果和错误信息都会返回给 AI
 
-【使用建议】
-1. 先使用 pymol_write_script 创建脚本文件
-2. 然后使用 pymol_run_script 执行脚本
-3. 脚本中的 print 输出会被返回给 AI
-
-【示例】
-```python
-# 使用 pymol_write_script 创建脚本：
-from pymol import cmd, stored
-
-stored.coords = []
-cmd.iterate("name CA", "stored.coords.append([x,y,z])")
-print(f"共有 {len(stored.coords)} 个CA原子")
-
-# 然后使用 pymol_run_script 执行
-```""",
+【使用流程】
+1. 先使用 pymol_write_script 创建脚本文件（返回文件路径）
+2. 将返回的 path 传给本工具的 filename 参数执行""",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "filename": {
                             "type": "string",
-                            "description": "Python 脚本文件路径（.py 或 .pym）"
+                            "description": "脚本文件路径（.py、.pym 或 .pml），通常来自 pymol_write_script 返回的 path 字段",
                         },
                         "namespace": {
                             "type": "string",
-                            "description": "脚本运行的命名空间: global(默认), local, main, module, private",
+                            "description": "Python 脚本的命名空间: global(默认), local, main, module, private。仅对 .py/.pym 文件有效",
                             "enum": ["global", "local", "main", "module", "private"],
-                            "default": "global"
-                        }
+                            "default": "global",
+                        },
                     },
-                    "required": ["filename"]
-                }
-            }
+                    "required": ["filename"],
+                },
+            },
         },
         {
             "type": "function",
@@ -262,12 +310,12 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                     "properties": {
                         "commands": {
                             "type": "string",
-                            "description": "PyMOL 命令或命令序列，如 'load protein.pdb; show cartoon; color rainbow'"
+                            "description": "PyMOL 命令或命令序列，如 'load protein.pdb; show cartoon; color rainbow'",
                         }
                     },
-                    "required": ["commands"]
-                }
-            }
+                    "required": ["commands"],
+                },
+            },
         },
         {
             "type": "function",
@@ -280,12 +328,12 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "selection": {
                             "type": "string",
                             "description": "选择表达式（可选，默认 all）",
-                            "default": "all"
+                            "default": "all",
                         }
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -298,17 +346,17 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "selection": {
                             "type": "string",
                             "description": "选择表达式（可选，默认 'sele' 即当前选择集）",
-                            "default": "sele"
+                            "default": "sele",
                         },
                         "include_atoms": {
                             "type": "boolean",
                             "description": "是否包含每个原子的详细信息（原子名、元素、坐标等）",
-                            "default": False
-                        }
+                            "default": False,
+                        },
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -321,12 +369,12 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "selection": {
                             "type": "string",
                             "description": "选择表达式，如 'sele', 'chain A and resi 50', '/1abc//A/50/CA'",
-                            "default": "sele"
+                            "default": "sele",
                         }
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -339,12 +387,12 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "selection": {
                             "type": "string",
                             "description": "选择表达式，如 'sele', 'chain A and resi 50', '/1abc//A/50'",
-                            "default": "sele"
+                            "default": "sele",
                         }
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -357,12 +405,12 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "selection": {
                             "type": "string",
                             "description": "选择表达式，如 'chain A', 'all', 'sele'",
-                            "default": "all"
+                            "default": "all",
                         }
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -374,12 +422,12 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                     "properties": {
                         "object_name": {
                             "type": "string",
-                            "description": "对象名称（可选，留空则返回所有对象信息）"
+                            "description": "对象名称（可选，留空则返回所有对象信息）",
                         }
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -391,16 +439,16 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                     "properties": {
                         "selection1": {
                             "type": "string",
-                            "description": "第一个选择，如 '/1abc//A/50/CA' 或 'chain A and resi 50 and name CA'"
+                            "description": "第一个选择，如 '/1abc//A/50/CA' 或 'chain A and resi 50 and name CA'",
                         },
                         "selection2": {
                             "type": "string",
-                            "description": "第二个选择，如 '/1abc//A/100/CA' 或 'chain A and resi 100 and name CA'"
-                        }
+                            "description": "第二个选择，如 '/1abc//A/100/CA' 或 'chain A and resi 100 and name CA'",
+                        },
                     },
-                    "required": ["selection1", "selection2"]
-                }
-            }
+                    "required": ["selection1", "selection2"],
+                },
+            },
         },
         {
             "type": "function",
@@ -412,20 +460,20 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                     "properties": {
                         "selection1": {
                             "type": "string",
-                            "description": "第一个原子选择"
+                            "description": "第一个原子选择",
                         },
                         "selection2": {
                             "type": "string",
-                            "description": "第二个原子选择（角顶点）"
+                            "description": "第二个原子选择（角顶点）",
                         },
                         "selection3": {
                             "type": "string",
-                            "description": "第三个原子选择"
-                        }
+                            "description": "第三个原子选择",
+                        },
                     },
-                    "required": ["selection1", "selection2", "selection3"]
-                }
-            }
+                    "required": ["selection1", "selection2", "selection3"],
+                },
+            },
         },
         {
             "type": "function",
@@ -437,24 +485,29 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                     "properties": {
                         "selection1": {
                             "type": "string",
-                            "description": "第一个原子选择"
+                            "description": "第一个原子选择",
                         },
                         "selection2": {
                             "type": "string",
-                            "description": "第二个原子选择"
+                            "description": "第二个原子选择",
                         },
                         "selection3": {
                             "type": "string",
-                            "description": "第三个原子选择"
+                            "description": "第三个原子选择",
                         },
                         "selection4": {
                             "type": "string",
-                            "description": "第四个原子选择"
-                        }
+                            "description": "第四个原子选择",
+                        },
                     },
-                    "required": ["selection1", "selection2", "selection3", "selection4"]
-                }
-            }
+                    "required": [
+                        "selection1",
+                        "selection2",
+                        "selection3",
+                        "selection4",
+                    ],
+                },
+            },
         },
         {
             "type": "function",
@@ -464,27 +517,21 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "selection1": {
-                            "type": "string",
-                            "description": "第一个选择"
-                        },
-                        "selection2": {
-                            "type": "string",
-                            "description": "第二个选择"
-                        },
+                        "selection1": {"type": "string", "description": "第一个选择"},
+                        "selection2": {"type": "string", "description": "第二个选择"},
                         "cutoff": {
                             "type": "number",
                             "description": "距离阈值（埃），默认 4.0",
-                            "default": 4.0
+                            "default": 4.0,
                         },
                         "name": {
                             "type": "string",
-                            "description": "创建的接触选择集名称（可选）"
-                        }
+                            "description": "创建的接触选择集名称（可选）",
+                        },
                     },
-                    "required": ["selection1", "selection2"]
-                }
-            }
+                    "required": ["selection1", "selection2"],
+                },
+            },
         },
         {
             "type": "function",
@@ -497,17 +544,28 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "representation": {
                             "type": "string",
                             "description": "表示形式: lines, sticks, spheres, surface, mesh, ribbon, cartoon, dots, labels, nonbonded",
-                            "enum": ["lines", "sticks", "spheres", "surface", "mesh", "ribbon", "cartoon", "dots", "labels", "nonbonded"]
+                            "enum": [
+                                "lines",
+                                "sticks",
+                                "spheres",
+                                "surface",
+                                "mesh",
+                                "ribbon",
+                                "cartoon",
+                                "dots",
+                                "labels",
+                                "nonbonded",
+                            ],
                         },
                         "selection": {
                             "type": "string",
                             "description": "选择表达式（可选，默认 all）",
-                            "default": "all"
-                        }
+                            "default": "all",
+                        },
                     },
-                    "required": ["representation"]
-                }
-            }
+                    "required": ["representation"],
+                },
+            },
         },
         {
             "type": "function",
@@ -520,17 +578,17 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "representation": {
                             "type": "string",
                             "description": "表示形式（可选，默认 everything）",
-                            "default": "everything"
+                            "default": "everything",
                         },
                         "selection": {
                             "type": "string",
                             "description": "选择表达式（可选，默认 all）",
-                            "default": "all"
-                        }
+                            "default": "all",
+                        },
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -569,17 +627,17 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                     "properties": {
                         "color": {
                             "type": "string",
-                            "description": "颜色名称或特殊着色模式"
+                            "description": "颜色名称或特殊着色模式",
                         },
                         "selection": {
                             "type": "string",
                             "description": "选择表达式（可选，默认 all）",
-                            "default": "all"
-                        }
+                            "default": "all",
+                        },
                     },
-                    "required": ["color"]
-                }
-            }
+                    "required": ["color"],
+                },
+            },
         },
         {
             "type": "function",
@@ -592,12 +650,12 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "color": {
                             "type": "string",
                             "description": "颜色名称: black, white, gray, grey, red, green, blue, yellow, cyan, magenta, orange",
-                            "default": "black"
+                            "default": "black",
                         }
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -610,17 +668,17 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "selection": {
                             "type": "string",
                             "description": "选择表达式（可选，默认 all）",
-                            "default": "all"
+                            "default": "all",
                         },
                         "buffer": {
                             "type": "number",
                             "description": "边界缓冲区（埃）",
-                            "default": 0
-                        }
+                            "default": 0,
+                        },
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -633,22 +691,22 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "axis": {
                             "type": "string",
                             "description": "旋转轴: x, y, z",
-                            "enum": ["x", "y", "z"]
+                            "enum": ["x", "y", "z"],
                         },
                         "angle": {
                             "type": "number",
                             "description": "旋转角度（度）",
-                            "default": 90
+                            "default": 90,
                         },
                         "selection": {
                             "type": "string",
                             "description": "选择表达式（可选，默认空表示旋转整个视图）",
-                            "default": ""
-                        }
+                            "default": "",
+                        },
                     },
-                    "required": ["axis"]
-                }
-            }
+                    "required": ["axis"],
+                },
+            },
         },
         {
             "type": "function",
@@ -660,16 +718,16 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                     "properties": {
                         "name": {
                             "type": "string",
-                            "description": "选择集名称，如 'sele', 'binding_site'"
+                            "description": "选择集名称，如 'sele', 'binding_site'",
                         },
                         "selection": {
                             "type": "string",
-                            "description": "选择表达式，如 'chain A', 'resi 1-100', 'name CA', 'resn ASP', 'byresi (name CA within 5 of chain B)'"
-                        }
+                            "description": "选择表达式，如 'chain A', 'resi 1-100', 'name CA', 'resn ASP', 'byresi (name CA within 5 of chain B)'",
+                        },
                     },
-                    "required": ["name", "selection"]
-                }
-            }
+                    "required": ["name", "selection"],
+                },
+            },
         },
         {
             "type": "function",
@@ -679,19 +737,16 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "selection": {
-                            "type": "string",
-                            "description": "选择表达式"
-                        },
+                        "selection": {"type": "string", "description": "选择表达式"},
                         "expression": {
                             "type": "string",
                             "description": "标签表达式，如 '%s%i'(残基名+残基号), '%n-%r'(原子名-残基), '%a'(元素), '%b'(B-factor), '%B'(B-factor格式化)",
-                            "default": "%s%i"
-                        }
+                            "default": "%s%i",
+                        },
                     },
-                    "required": ["selection"]
-                }
-            }
+                    "required": ["selection"],
+                },
+            },
         },
         {
             "type": "function",
@@ -704,17 +759,17 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "width": {
                             "type": "integer",
                             "description": "图像宽度（像素，可选）",
-                            "default": 0
+                            "default": 0,
                         },
                         "height": {
                             "type": "integer",
                             "description": "图像高度（像素，可选）",
-                            "default": 0
-                        }
+                            "default": 0,
+                        },
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -726,34 +781,30 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                     "properties": {
                         "filename": {
                             "type": "string",
-                            "description": "保存的文件名，如 'image.png'"
+                            "description": "保存的文件名，如 'image.png'",
                         },
                         "dpi": {
                             "type": "number",
                             "description": "DPI 设置",
-                            "default": 300
+                            "default": 300,
                         },
                         "ray": {
                             "type": "integer",
                             "description": "是否使用光线追踪 (1=yes, 0=no)",
-                            "default": 1
-                        }
+                            "default": 1,
+                        },
                     },
-                    "required": ["filename"]
-                }
-            }
+                    "required": ["filename"],
+                },
+            },
         },
         {
             "type": "function",
             "function": {
                 "name": "pymol_reset",
                 "description": "重置视图到默认状态。",
-                "parameters": {
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
-            }
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
         },
         {
             "type": "function",
@@ -766,12 +817,12 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                         "selection": {
                             "type": "string",
                             "description": "选择表达式（可选，默认 all）",
-                            "default": "all"
+                            "default": "all",
                         }
                     },
-                    "required": []
-                }
-            }
+                    "required": [],
+                },
+            },
         },
         {
             "type": "function",
@@ -781,14 +832,11 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "name": {
-                            "type": "string",
-                            "description": "对象或选择集名称"
-                        }
+                        "name": {"type": "string", "description": "对象或选择集名称"}
                     },
-                    "required": ["name"]
-                }
-            }
+                    "required": ["name"],
+                },
+            },
         },
         {
             "type": "function",
@@ -800,69 +848,72 @@ print(f"共有 {len(stored.coords)} 个CA原子")
                     "properties": {
                         "setting": {
                             "type": "string",
-                            "description": "设置名称，如 'ray_shadows', 'cartoon_cylindrical_helices', 'bg_gradient', 'transparency'"
+                            "description": "设置名称，如 'ray_shadows', 'cartoon_cylindrical_helices', 'bg_gradient', 'transparency'",
                         },
                         "value": {
                             "type": "string",
-                            "description": "设置值，如 'on', 'off', 'on, blue, white', '1', '0', '0.5'"
+                            "description": "设置值，如 'on', 'off', 'on, blue, white', '1', '0', '0.5'",
                         },
                         "selection": {
                             "type": "string",
                             "description": "选择表达式（可选，用于对象特定设置）",
-                            "default": ""
-                        }
+                            "default": "",
+                        },
                     },
-                    "required": ["setting", "value"]
-                }
-            }
-        }
+                    "required": ["setting", "value"],
+                },
+            },
+        },
     ]
-    
+
     if is_vision_model:
-        tools.append({
-            "type": "function",
-            "function": {
-                "name": "pymol_capture_view",
-                "description": "捕获当前PyMOL视图的截图。返回当前渲染画面的base64编码图片数据，让你能够看到实际的画面效果。",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "width": {
-                            "type": "integer",
-                            "description": "截图宽度（像素），默认800，最大1920",
-                            "default": 800
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "pymol_capture_view",
+                    "description": "捕获当前PyMOL视图的截图。返回当前渲染画面的base64编码图片数据，让你能够看到实际的画面效果。",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "width": {
+                                "type": "integer",
+                                "description": "截图宽度（像素），默认800，最大1920",
+                                "default": 800,
+                            },
+                            "height": {
+                                "type": "integer",
+                                "description": "截图高度（像素），默认600，最大1080",
+                                "default": 600,
+                            },
+                            "ray": {
+                                "type": "integer",
+                                "description": "是否使用光线追踪渲染（1=是，0=否），默认0",
+                                "default": 0,
+                            },
                         },
-                        "height": {
-                            "type": "integer",
-                            "description": "截图高度（像素），默认600，最大1080",
-                            "default": 600
-                        },
-                        "ray": {
-                            "type": "integer",
-                            "description": "是否使用光线追踪渲染（1=是，0=否），默认0",
-                            "default": 0
-                        }
+                        "required": [],
                     },
-                    "required": []
-                }
+                },
             }
-        })
-    
+        )
+
     return tools
 
 
 class ToolExecutor:
     """工具执行器"""
-    
+
     def __init__(self):
         self.cmd = None
         self._ensure_cmd()
-    
+
     def _ensure_cmd(self):
         """确保cmd模块已加载"""
         if self.cmd is None:
             try:
                 from pymol import cmd
+
                 self.cmd = cmd
             except ImportError:
                 raise RuntimeError("PyMOL cmd模块不可用")
@@ -870,40 +921,40 @@ class ToolExecutor:
     def _preprocess_command(self, cmd, command: str) -> str:
         """
         预处理 PyMOL 命令，处理特殊颜色模式等
-        
+
         Args:
             cmd: PyMOL cmd 模块
             command: 原始命令
-            
+
         Returns:
             处理后的命令
         """
         import re
-        
+
         command_lower = command.lower().strip()
-        
-        color_pattern = r'^color\s+(\S+)\s*,?\s*(.*)$'
+
+        color_pattern = r"^color\s+(\S+)\s*,?\s*(.*)$"
         match = re.match(color_pattern, command, re.IGNORECASE)
-        
+
         if match:
             color_name = match.group(1).lower()
             selection = match.group(2).strip() if match.group(2) else "all"
-            
+
             if color_name == "rainbow":
-                return f'spectrum count, rainbow, {selection}'
+                return f"spectrum count, rainbow, {selection}"
             elif color_name == "by_element":
-                return f'color atomic, ({selection}) and not elem C; color carbon, elem C and ({selection})'
+                return f"color atomic, ({selection}) and not elem C; color carbon, elem C and ({selection})"
             elif color_name == "by_chain":
-                return f'util.cbc {selection}'
+                return f"util.cbc {selection}"
             elif color_name == "by_ss":
-                return f'color ss, {selection}'
+                return f"color ss, {selection}"
             elif color_name == "by_resi":
-                return f'spectrum count, rainbow, {selection}'
+                return f"spectrum count, rainbow, {selection}"
             elif color_name == "by_b":
-                return f'spectrum b, blue_red, {selection}'
-        
+                return f"spectrum b, blue_red, {selection}"
+
         return command
-    
+
     def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行指定的 PyMOL 工具
@@ -918,12 +969,12 @@ class ToolExecutor:
         # 打印调试信息到 PyMOL 控制台
         print(f"[PyMOL AI Assistant] 执行工具: {tool_name}")
         print(f"[PyMOL AI Assistant] 参数: {json.dumps(arguments, ensure_ascii=False)}")
-        
+
         # 记录到日志
         logger.logger.info(
             logger.TOOL_CALL,
             f"执行工具: {tool_name}",
-            {"tool": tool_name, "params": arguments}
+            {"tool": tool_name, "params": arguments},
         )
 
         try:
@@ -932,19 +983,16 @@ class ToolExecutor:
             error_msg = "无法导入 PyMOL cmd 模块"
             print(f"[PyMOL AI Assistant] 错误: {error_msg}")
             logger.logger.error(logger.ERRORS, error_msg)
-            return {
-                "success": False,
-                "message": error_msg
-            }
+            return {"success": False, "message": error_msg}
 
         try:
             result = self._execute_tool(cmd, tool_name, arguments)
-            
+
             # 记录成功结果
             logger.logger.info(
                 logger.TOOL_CALL,
                 f"工具执行成功: {tool_name}",
-                {"tool": tool_name, "result": result}
+                {"tool": tool_name, "result": result},
             )
             return result
 
@@ -955,23 +1003,22 @@ class ToolExecutor:
             print(f"[PyMOL AI Assistant] 工具: {tool_name}")
             print(f"[PyMOL AI Assistant] 参数: {arguments}")
             print(f"[PyMOL AI Assistant] Traceback:\n{tb}")
-            
+
             # 记录错误到日志
             logger.logger.error(
                 logger.ERRORS,
                 f"工具执行失败: {tool_name} - {error_msg}",
-                {"tool": tool_name, "params": arguments, "traceback": tb}
+                {"tool": tool_name, "params": arguments, "traceback": tb},
             )
-            
-            return {
-                "success": False,
-                "message": error_msg,
-                "error": tb
-            }
-    
-    def _execute_tool(self, cmd, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+
+            return {"success": False, "message": error_msg, "error": tb}
+
+    def _execute_tool(
+        self, cmd, tool_name: str, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """实际执行工具的辅助方法"""
         import tempfile, os, sys
+
         if tool_name == "pymol_fetch":
             code = arguments.get("code", "")
             name = arguments.get("name", "")
@@ -995,13 +1042,13 @@ class ToolExecutor:
                 return {
                     "success": False,
                     "message": f"加载失败: {feedback_text}",
-                    "output": feedback_text
+                    "output": feedback_text,
                 }
 
             return {
                 "success": True,
                 "message": f"已从 PDB 下载并加载 {code}，对象名为 '{name}'",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_load":
@@ -1033,13 +1080,13 @@ class ToolExecutor:
                     return {
                         "success": False,
                         "message": f"加载失败: {feedback_text}",
-                        "output": feedback_text
+                        "output": feedback_text,
                     }
 
                 return {
                     "success": True,
                     "message": f"已加载文件: {filename}",
-                    "output": feedback_text
+                    "output": feedback_text,
                 }
             except Exception as e:
                 feedback = cmd._get_feedback()
@@ -1047,7 +1094,7 @@ class ToolExecutor:
                 return {
                     "success": False,
                     "message": f"加载失败: {str(e)}",
-                    "output": feedback_text if feedback_text else str(e)
+                    "output": feedback_text if feedback_text else str(e),
                 }
 
         elif tool_name == "pymol_write_script":
@@ -1056,13 +1103,11 @@ class ToolExecutor:
             script_type = arguments.get("script_type", "python")
 
             if not code:
-                return {
-                    "success": False,
-                    "message": "错误: 未指定脚本代码"
-                }
+                return {"success": False, "message": "错误: 未指定脚本代码"}
 
             try:
                 import time
+
                 timestamp = int(time.time() * 1000)
 
                 if name:
@@ -1078,11 +1123,10 @@ class ToolExecutor:
                     file_ext = ".py"
                     type_display = "Python"
 
-
                 temp_dir = tempfile.gettempdir()
                 script_path = os.path.join(temp_dir, f"{script_name}{file_ext}")
 
-                with open(script_path, 'w', encoding='utf-8') as f:
+                with open(script_path, "w", encoding="utf-8") as f:
                     f.write(code)
 
                 return {
@@ -1090,23 +1134,17 @@ class ToolExecutor:
                     "message": f"{type_display}脚本已创建: {script_path}",
                     "path": script_path,
                     "filename": script_name + file_ext,
-                    "script_type": script_type
+                    "script_type": script_type,
                 }
             except Exception as e:
-                return {
-                    "success": False,
-                    "message": f"创建脚本失败: {str(e)}"
-                }
+                return {"success": False, "message": f"创建脚本失败: {str(e)}"}
 
         elif tool_name == "pymol_run_script":
             filename = arguments.get("filename", "")
             namespace = arguments.get("namespace", "global")
 
             if not filename:
-                return {
-                    "success": False,
-                    "message": "错误: 未指定脚本文件路径"
-                }
+                return {"success": False, "message": "错误: 未指定脚本文件路径"}
 
             # 扩展路径（支持环境变量）
             expanded_path = os.path.expandvars(filename)
@@ -1119,15 +1157,15 @@ class ToolExecutor:
             if not os.path.exists(expanded_path):
                 return {
                     "success": False,
-                    "message": f"脚本文件不存在: {filename} (解析后: {expanded_path})"
+                    "message": f"脚本文件不存在: {filename} (解析后: {expanded_path})",
                 }
 
             # 检查文件扩展名
             _, ext = os.path.splitext(expanded_path.lower())
-            if ext not in ['.py', '.pym', '.pml']:
+            if ext not in [".py", ".pym", ".pml"]:
                 return {
                     "success": False,
-                    "message": f"不支持的脚本类型: {ext}。只支持 .py, .pym 和 .pml 文件"
+                    "message": f"不支持的脚本类型: {ext}。只支持 .py, .pym 和 .pml 文件",
                 }
 
             # 清除之前的反馈
@@ -1141,9 +1179,9 @@ class ToolExecutor:
                 sys.stdout = captured_output
 
                 # 根据文件类型执行
-                if ext == '.pml':
+                if ext == ".pml":
                     # 读取 pml 文件内容并使用 cmd.do 执行
-                    with open(expanded_path, 'r', encoding='utf-8') as f:
+                    with open(expanded_path, "r", encoding="utf-8") as f:
                         pml_content = f.read()
                     cmd.do(pml_content)
                     script_type = "PyMOL"
@@ -1173,7 +1211,11 @@ class ToolExecutor:
 
                 # 检查是否有错误
                 has_error = False
-                if feedback_text and ("Error" in feedback_text or "error" in feedback_text.lower() or "Traceback" in feedback_text):
+                if feedback_text and (
+                    "Error" in feedback_text
+                    or "error" in feedback_text.lower()
+                    or "Traceback" in feedback_text
+                ):
                     has_error = True
 
                 if has_error:
@@ -1181,20 +1223,16 @@ class ToolExecutor:
                         "success": False,
                         "message": f"脚本执行出错: {os.path.basename(filename)}",
                         "output": combined_output,
-                        "error": feedback_text[:500] if feedback_text else ""
+                        "error": feedback_text[:500] if feedback_text else "",
                     }
 
                 # 根据脚本类型返回不同的消息
-                if ext == '.pml':
+                if ext == ".pml":
                     message = f"成功执行 PyMOL 脚本: {os.path.basename(filename)}"
                 else:
                     message = f"成功执行 Python 脚本: {os.path.basename(filename)} (namespace: {namespace})"
 
-                return {
-                    "success": True,
-                    "message": message,
-                    "output": combined_output
-                }
+                return {"success": True, "message": message, "output": combined_output}
 
             except Exception as e:
                 # 确保恢复标准输出
@@ -1210,7 +1248,7 @@ class ToolExecutor:
                     "success": False,
                     "message": error_msg,
                     "output": script_output if script_output else "",
-                    "error": tb
+                    "error": tb,
                 }
 
         elif tool_name == "pymol_do_command":
@@ -1233,7 +1271,7 @@ class ToolExecutor:
 
                 try:
                     if processed_command != command:
-                        for cmd_part in processed_command.split(';'):
+                        for cmd_part in processed_command.split(";"):
                             cmd_part = cmd_part.strip()
                             if cmd_part:
                                 cmd.do(cmd_part)
@@ -1241,35 +1279,50 @@ class ToolExecutor:
                         cmd.do(command)
                 except Exception as e:
                     has_error = True
-                    results.append({
-                        "command": command,
-                        "status": "error",
-                        "message": str(e),
-                        "output": str(e)
-                    })
+                    results.append(
+                        {
+                            "command": command,
+                            "status": "error",
+                            "message": str(e),
+                            "output": str(e),
+                        }
+                    )
                     continue
 
                 feedback = cmd._get_feedback()
                 feedback_text = "\n".join(feedback) if feedback else ""
 
-                error_patterns = ["Error:", "error:", "ERROR:", "Traceback", "Exception", "Warning:"]
-                has_error_in_output = any(pattern in feedback_text for pattern in error_patterns)
+                error_patterns = [
+                    "Error:",
+                    "error:",
+                    "ERROR:",
+                    "Traceback",
+                    "Exception",
+                    "Warning:",
+                ]
+                has_error_in_output = any(
+                    pattern in feedback_text for pattern in error_patterns
+                )
 
                 if has_error_in_output:
                     has_error = True
-                    results.append({
-                        "command": command,
-                        "status": "error",
-                        "message": feedback_text,
-                        "output": feedback_text
-                    })
+                    results.append(
+                        {
+                            "command": command,
+                            "status": "error",
+                            "message": feedback_text,
+                            "output": feedback_text,
+                        }
+                    )
                 else:
-                    results.append({
-                        "command": command,
-                        "status": "success",
-                        "message": "命令执行成功",
-                        "output": feedback_text if feedback_text else ""
-                    })
+                    results.append(
+                        {
+                            "command": command,
+                            "status": "success",
+                            "message": "命令执行成功",
+                            "output": feedback_text if feedback_text else "",
+                        }
+                    )
 
             success_count = sum(1 for r in results if r["status"] == "success")
             error_count = len(results) - success_count
@@ -1282,20 +1335,24 @@ class ToolExecutor:
             combined_output = "\n".join(all_outputs).strip()
 
             if error_count > 0:
-                error_messages = [f"命令 '{r['command']}': {r['message']}" for r in results if r["status"] == "error"]
+                error_messages = [
+                    f"命令 '{r['command']}': {r['message']}"
+                    for r in results
+                    if r["status"] == "error"
+                ]
                 return {
                     "success": False,
                     "message": f"执行完成: {success_count} 个成功, {error_count} 个失败",
                     "details": results,
                     "errors": error_messages,
-                    "output": combined_output
+                    "output": combined_output,
                 }
             else:
                 return {
                     "success": True,
                     "message": f"成功执行 {success_count} 个命令",
                     "details": results,
-                    "output": combined_output
+                    "output": combined_output,
                 }
 
         elif tool_name == "pymol_get_info":
@@ -1313,13 +1370,13 @@ class ToolExecutor:
                 "atom_count": atom_count,
                 "object_list": object_list,
                 "chains": chains,
-                "selection": selection
+                "selection": selection,
             }
 
             return {
                 "success": True,
                 "message": f"分子信息: {atom_count} 个原子, {len(object_list)} 个对象, 链: {chains}",
-                "data": info
+                "data": info,
             }
 
         elif tool_name == "pymol_get_selection_details":
@@ -1331,14 +1388,16 @@ class ToolExecutor:
                 return {
                     "success": True,
                     "message": f"选择集 '{selection}' 为空，没有选中任何原子",
-                    "data": {"selection": selection, "atom_count": 0, "residues": []}
+                    "data": {"selection": selection, "atom_count": 0, "residues": []},
                 }
 
             # 收集残基信息
             residues = {}
             atoms = []
 
-            def collect_residue_info(model, chain, resi, resn, ss, atom_name, atom_elem, atom_b, atom_id):
+            def collect_residue_info(
+                model, chain, resi, resn, ss, atom_name, atom_elem, atom_b, atom_id
+            ):
                 key = (model, chain, resi, resn)
                 if key not in residues:
                     residues[key] = {
@@ -1348,49 +1407,65 @@ class ToolExecutor:
                         "residue_name": resn,
                         "secondary_structure": ss,
                         "atom_count": 0,
-                        "atoms": []
+                        "atoms": [],
                     }
                 residues[key]["atom_count"] += 1
-                residues[key]["atoms"].append({
-                    "name": atom_name,
-                    "element": atom_elem,
-                    "b_factor": atom_b,
-                    "id": atom_id
-                })
-
-                if include_atoms:
-                    atoms.append({
-                        "model": model,
-                        "chain": chain,
-                        "residue_number": resi,
-                        "residue_name": resn,
-                        "atom_name": atom_name,
+                residues[key]["atoms"].append(
+                    {
+                        "name": atom_name,
                         "element": atom_elem,
                         "b_factor": atom_b,
-                        "id": atom_id
-                    })
+                        "id": atom_id,
+                    }
+                )
+
+                if include_atoms:
+                    atoms.append(
+                        {
+                            "model": model,
+                            "chain": chain,
+                            "residue_number": resi,
+                            "residue_name": resn,
+                            "atom_name": atom_name,
+                            "element": atom_elem,
+                            "b_factor": atom_b,
+                            "id": atom_id,
+                        }
+                    )
 
             # 获取原子详细信息
-            cmd.iterate(selection,
-                        "collect_residue_info(model, chain, resi, resn, ss, name, elem, b, ID)",
-                        space={"collect_residue_info": collect_residue_info})
+            cmd.iterate(
+                selection,
+                "collect_residue_info(model, chain, resi, resn, ss, name, elem, b, ID)",
+                space={"collect_residue_info": collect_residue_info},
+            )
 
             # 获取坐标信息（如果需要）
             if include_atoms:
                 for i, atom in enumerate(atoms):
-                    coords = cmd.get_coords(f"/{atom['model']}//{atom['chain']}/{atom['residue_number']}/{atom['atom_name']}")
+                    coords = cmd.get_coords(
+                        f"/{atom['model']}//{atom['chain']}/{atom['residue_number']}/{atom['atom_name']}"
+                    )
                     if coords is not None and len(coords) > 0:
                         atom["coordinates"] = coords[0].tolist()
 
             # 转换为列表
-            residue_list = sorted(residues.values(),
-                                key=lambda x: (x["model"], x["chain"], int(x["residue_number"]) if x["residue_number"].isdigit() else 999999))
+            residue_list = sorted(
+                residues.values(),
+                key=lambda x: (
+                    x["model"],
+                    x["chain"],
+                    int(x["residue_number"])
+                    if x["residue_number"].isdigit()
+                    else 999999,
+                ),
+            )
 
             result = {
                 "selection": selection,
                 "atom_count": atom_count,
                 "residue_count": len(residue_list),
-                "residues": residue_list
+                "residues": residue_list,
             }
 
             if include_atoms:
@@ -1399,14 +1474,12 @@ class ToolExecutor:
             message = f"选择集 '{selection}' 包含 {atom_count} 个原子，共 {len(residue_list)} 个残基：\n"
             for res in residue_list:
                 ss_map = {"H": "螺旋", "S": "折叠", "L": "环", "": "无"}
-                ss_text = ss_map.get(res["secondary_structure"], res["secondary_structure"])
+                ss_text = ss_map.get(
+                    res["secondary_structure"], res["secondary_structure"]
+                )
                 message += f"  - {res['residue_name']} {res['residue_number']} (链 {res['chain']}, {ss_text}, {res['atom_count']} 原子)\n"
 
-            return {
-                "success": True,
-                "message": message,
-                "data": result
-            }
+            return {"success": True, "message": message, "data": result}
 
         elif tool_name == "pymol_get_atom_info":
             selection = arguments.get("selection", "sele")
@@ -1416,38 +1489,52 @@ class ToolExecutor:
                 return {
                     "success": True,
                     "message": f"选择 '{selection}' 没有选中任何原子",
-                    "data": {"selection": selection, "atoms": []}
+                    "data": {"selection": selection, "atoms": []},
                 }
 
             atoms = []
 
-            def collect_atom_info(model, chain, resi, resn, ss, name, elem, b, q, ID, type):
+            def collect_atom_info(
+                model, chain, resi, resn, ss, name, elem, b, q, ID, type
+            ):
                 coords = cmd.get_coords(f"/{model}//{chain}/{resi}/{name}")
-                coord_list = coords[0].tolist() if coords is not None and len(coords) > 0 else None
+                coord_list = (
+                    coords[0].tolist()
+                    if coords is not None and len(coords) > 0
+                    else None
+                )
 
-                atoms.append({
-                    "model": model,
-                    "chain": chain,
-                    "residue_number": resi,
-                    "residue_name": resn,
-                    "secondary_structure": ss,
-                    "atom_name": name,
-                    "element": elem,
-                    "b_factor": b,
-                    "occupancy": q,
-                    "id": ID,
-                    "type": type,
-                    "coordinates": coord_list
-                })
+                atoms.append(
+                    {
+                        "model": model,
+                        "chain": chain,
+                        "residue_number": resi,
+                        "residue_name": resn,
+                        "secondary_structure": ss,
+                        "atom_name": name,
+                        "element": elem,
+                        "b_factor": b,
+                        "occupancy": q,
+                        "id": ID,
+                        "type": type,
+                        "coordinates": coord_list,
+                    }
+                )
 
-            cmd.iterate(selection,
-                        "collect_atom_info(model, chain, resi, resn, ss, name, elem, b, q, ID, type)",
-                        space={"collect_atom_info": collect_atom_info})
+            cmd.iterate(
+                selection,
+                "collect_atom_info(model, chain, resi, resn, ss, name, elem, b, q, ID, type)",
+                space={"collect_atom_info": collect_atom_info},
+            )
 
             return {
                 "success": True,
                 "message": f"找到 {atom_count} 个原子",
-                "data": {"selection": selection, "atom_count": atom_count, "atoms": atoms}
+                "data": {
+                    "selection": selection,
+                    "atom_count": atom_count,
+                    "atoms": atoms,
+                },
             }
 
         elif tool_name == "pymol_get_residue_info":
@@ -1463,12 +1550,15 @@ class ToolExecutor:
                         "chain": chain,
                         "residue_number": resi,
                         "residue_name": resn,
-                        "secondary_structure": ss
+                        "secondary_structure": ss,
                     }
 
-            cmd.iterate_state(1, selection,
-                            "collect_res_info(model, chain, resi, resn, ss)",
-                            space={"collect_res_info": collect_res_info})
+            cmd.iterate_state(
+                1,
+                selection,
+                "collect_res_info(model, chain, resi, resn, ss)",
+                space={"collect_res_info": collect_res_info},
+            )
 
             # 计算每个残基的原子数
             for key in residues:
@@ -1476,13 +1566,25 @@ class ToolExecutor:
                 atom_count = cmd.count_atoms(f"/{model}//{chain}/{resi}/")
                 residues[key]["atom_count"] = atom_count
 
-            residue_list = sorted(residues.values(),
-                                key=lambda x: (x["model"], x["chain"], int(x["residue_number"]) if x["residue_number"].isdigit() else 999999))
+            residue_list = sorted(
+                residues.values(),
+                key=lambda x: (
+                    x["model"],
+                    x["chain"],
+                    int(x["residue_number"])
+                    if x["residue_number"].isdigit()
+                    else 999999,
+                ),
+            )
 
             return {
                 "success": True,
                 "message": f"找到 {len(residue_list)} 个残基",
-                "data": {"selection": selection, "residue_count": len(residue_list), "residues": residue_list}
+                "data": {
+                    "selection": selection,
+                    "residue_count": len(residue_list),
+                    "residues": residue_list,
+                },
             }
 
         elif tool_name == "pymol_get_chain_info":
@@ -1501,15 +1603,21 @@ class ToolExecutor:
 
                 # 获取残基范围
                 residues = {}
+
                 def collect_res_info(resi, resn):
                     residues[(resi, resn)] = True
 
                 try:
-                    cmd.iterate(chain_sel, "collect_res_info(resi, resn)",
-                               space={"collect_res_info": collect_res_info})
+                    cmd.iterate(
+                        chain_sel,
+                        "collect_res_info(resi, resn)",
+                        space={"collect_res_info": collect_res_info},
+                    )
 
-                    resi_list = sorted([k[0] for k in residues.keys()],
-                                       key=lambda x: int(x) if x.isdigit() else 999999)
+                    resi_list = sorted(
+                        [k[0] for k in residues.keys()],
+                        key=lambda x: int(x) if x.isdigit() else 999999,
+                    )
 
                     if resi_list:
                         resi_min = resi_list[0]
@@ -1519,17 +1627,21 @@ class ToolExecutor:
                 except:
                     resi_min = resi_max = ""
 
-                chain_info.append({
-                    "chain": chain,
-                    "atom_count": atom_count,
-                    "residue_range": f"{resi_min}-{resi_max}" if resi_min and resi_max else "",
-                    "residue_count": len(residues)
-                })
+                chain_info.append(
+                    {
+                        "chain": chain,
+                        "atom_count": atom_count,
+                        "residue_range": f"{resi_min}-{resi_max}"
+                        if resi_min and resi_max
+                        else "",
+                        "residue_count": len(residues),
+                    }
+                )
 
             return {
                 "success": True,
                 "message": f"找到 {len(chain_info)} 条链",
-                "data": {"chain_count": len(chain_info), "chains": chain_info}
+                "data": {"chain_count": len(chain_info), "chains": chain_info},
             }
 
         elif tool_name == "pymol_get_object_info":
@@ -1554,27 +1666,33 @@ class ToolExecutor:
 
                 # 获取残基数
                 residues = set()
+
                 def collect_res(resi, resn, chain):
                     residues.add((resi, resn, chain))
 
                 try:
-                    cmd.iterate(obj, "collect_res(resi, resn, chain)",
-                               space={"collect_res": collect_res})
+                    cmd.iterate(
+                        obj,
+                        "collect_res(resi, resn, chain)",
+                        space={"collect_res": collect_res},
+                    )
                 except:
                     pass
 
-                object_info.append({
-                    "name": obj,
-                    "atom_count": atom_count,
-                    "state_count": state_count,
-                    "residue_count": len(residues),
-                    "chains": chains
-                })
+                object_info.append(
+                    {
+                        "name": obj,
+                        "atom_count": atom_count,
+                        "state_count": state_count,
+                        "residue_count": len(residues),
+                        "chains": chains,
+                    }
+                )
 
             return {
                 "success": True,
                 "message": f"对象信息: {len(object_info)} 个对象",
-                "data": {"object_count": len(object_info), "objects": object_info}
+                "data": {"object_count": len(object_info), "objects": object_info},
             }
 
         elif tool_name == "pymol_get_distance":
@@ -1600,13 +1718,14 @@ class ToolExecutor:
                 return {
                     "success": True,
                     "message": f"距离: {distance:.3f} Å{note}",
-                    "data": {"selection1": selection1, "selection2": selection2, "distance": distance}
+                    "data": {
+                        "selection1": selection1,
+                        "selection2": selection2,
+                        "distance": distance,
+                    },
                 }
             except Exception as e:
-                return {
-                    "success": False,
-                    "message": f"计算距离失败: {str(e)}"
-                }
+                return {"success": False, "message": f"计算距离失败: {str(e)}"}
 
         elif tool_name == "pymol_get_angle":
             selection1 = arguments.get("selection1", "")
@@ -1618,13 +1737,15 @@ class ToolExecutor:
                 return {
                     "success": True,
                     "message": f"角度: {angle:.2f}°",
-                    "data": {"selection1": selection1, "selection2": selection2, "selection3": selection3, "angle": angle}
+                    "data": {
+                        "selection1": selection1,
+                        "selection2": selection2,
+                        "selection3": selection3,
+                        "angle": angle,
+                    },
                 }
             except Exception as e:
-                return {
-                    "success": False,
-                    "message": f"计算角度失败: {str(e)}"
-                }
+                return {"success": False, "message": f"计算角度失败: {str(e)}"}
 
         elif tool_name == "pymol_get_dihedral":
             selection1 = arguments.get("selection1", "")
@@ -1633,18 +1754,22 @@ class ToolExecutor:
             selection4 = arguments.get("selection4", "")
 
             try:
-                dihedral = cmd.get_dihedral(selection1, selection2, selection3, selection4)
+                dihedral = cmd.get_dihedral(
+                    selection1, selection2, selection3, selection4
+                )
                 return {
                     "success": True,
                     "message": f"二面角: {dihedral:.2f}°",
-                    "data": {"selection1": selection1, "selection2": selection2, "selection3": selection3,
-                            "selection4": selection4, "dihedral": dihedral}
+                    "data": {
+                        "selection1": selection1,
+                        "selection2": selection2,
+                        "selection3": selection3,
+                        "selection4": selection4,
+                        "dihedral": dihedral,
+                    },
                 }
             except Exception as e:
-                return {
-                    "success": False,
-                    "message": f"计算二面角失败: {str(e)}"
-                }
+                return {"success": False, "message": f"计算二面角失败: {str(e)}"}
 
         elif tool_name == "pymol_find_contacts":
             selection1 = arguments.get("selection1", "")
@@ -1668,14 +1793,16 @@ class ToolExecutor:
                 return {
                     "success": True,
                     "message": f"找到 {contact_count} 对接触原子（距离 < {cutoff} Å）",
-                    "data": {"selection1": selection1, "selection2": selection2, "cutoff": cutoff,
-                            "contact_count": contact_count, "contacts": result}
+                    "data": {
+                        "selection1": selection1,
+                        "selection2": selection2,
+                        "cutoff": cutoff,
+                        "contact_count": contact_count,
+                        "contacts": result,
+                    },
                 }
             except Exception as e:
-                return {
-                    "success": False,
-                    "message": f"查找接触失败: {str(e)}"
-                }
+                return {"success": False, "message": f"查找接触失败: {str(e)}"}
 
         elif tool_name == "pymol_show":
             representation = arguments.get("representation", "")
@@ -1687,7 +1814,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"已显示 {representation}，选择: {selection}",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_hide":
@@ -1700,7 +1827,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"已隐藏 {representation}，选择: {selection}",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_color":
@@ -1708,10 +1835,7 @@ class ToolExecutor:
             selection = arguments.get("selection", "all")
 
             if not color:
-                return {
-                    "success": False,
-                    "message": "错误: 未指定颜色"
-                }
+                return {"success": False, "message": "错误: 未指定颜色"}
 
             cmd._get_feedback()
 
@@ -1737,28 +1861,94 @@ class ToolExecutor:
 
                 else:
                     valid_colors = [
-                        'red', 'green', 'blue', 'yellow', 'cyan', 'magenta', 'white', 'black',
-                        'tv_red', 'raspberry', 'darksalmon', 'salmon', 'deepsalmon', 'warmpink',
-                        'firebrick', 'ruby', 'chocolate', 'brown',
-                        'tv_green', 'chartreuse', 'splitpea', 'smudge', 'palegreen', 'limegreen',
-                        'lime', 'limon', 'forest',
-                        'tv_blue', 'marine', 'slate', 'lightblue', 'skyblue', 'purpleblue',
-                        'deepblue', 'density',
-                        'tv_yellow', 'paleyellow', 'yelloworange', 'wheat', 'sand',
-                        'lightmagenta', 'hotpink', 'pink', 'lightpink', 'dirtyviolet', 'violet',
-                        'violetpurple', 'purple', 'deeppurple',
-                        'palecyan', 'aquamarine', 'greencyan', 'teal', 'deepteal', 'lightteal',
-                        'tv_orange', 'brightorange', 'lightorange', 'olive', 'deepolive',
-                        'gray', 'grey', 'gray90', 'gray80', 'gray70', 'gray60', 'gray50',
-                        'gray40', 'gray30', 'gray20', 'gray10',
-                        'orange', 'pink', 'violet', 'brown', 'wheat', 'slate', 'salmon',
-                        'atomic', 'auto', 'default', 'current'
+                        "red",
+                        "green",
+                        "blue",
+                        "yellow",
+                        "cyan",
+                        "magenta",
+                        "white",
+                        "black",
+                        "tv_red",
+                        "raspberry",
+                        "darksalmon",
+                        "salmon",
+                        "deepsalmon",
+                        "warmpink",
+                        "firebrick",
+                        "ruby",
+                        "chocolate",
+                        "brown",
+                        "tv_green",
+                        "chartreuse",
+                        "splitpea",
+                        "smudge",
+                        "palegreen",
+                        "limegreen",
+                        "lime",
+                        "limon",
+                        "forest",
+                        "tv_blue",
+                        "marine",
+                        "slate",
+                        "lightblue",
+                        "skyblue",
+                        "purpleblue",
+                        "deepblue",
+                        "density",
+                        "tv_yellow",
+                        "paleyellow",
+                        "yelloworange",
+                        "wheat",
+                        "sand",
+                        "lightmagenta",
+                        "hotpink",
+                        "pink",
+                        "lightpink",
+                        "dirtyviolet",
+                        "violet",
+                        "violetpurple",
+                        "purple",
+                        "deeppurple",
+                        "palecyan",
+                        "aquamarine",
+                        "greencyan",
+                        "teal",
+                        "deepteal",
+                        "lightteal",
+                        "tv_orange",
+                        "brightorange",
+                        "lightorange",
+                        "olive",
+                        "deepolive",
+                        "gray",
+                        "grey",
+                        "gray90",
+                        "gray80",
+                        "gray70",
+                        "gray60",
+                        "gray50",
+                        "gray40",
+                        "gray30",
+                        "gray20",
+                        "gray10",
+                        "orange",
+                        "pink",
+                        "violet",
+                        "brown",
+                        "wheat",
+                        "slate",
+                        "salmon",
+                        "atomic",
+                        "auto",
+                        "default",
+                        "current",
                     ]
 
                     if color not in valid_colors:
                         color_aliases = {
-                            'gray': 'grey',
-                            'grey': 'gray',
+                            "gray": "grey",
+                            "grey": "gray",
                         }
                         if color in color_aliases:
                             color = color_aliases[color]
@@ -1775,13 +1965,13 @@ class ToolExecutor:
                     return {
                         "success": False,
                         "message": f"着色失败: {feedback_text}",
-                        "output": feedback_text
+                        "output": feedback_text,
                     }
 
                 return {
                     "success": True,
                     "message": f"已将 '{selection}' 设置为 '{color}' 颜色",
-                    "output": feedback_text
+                    "output": feedback_text,
                 }
 
             except Exception as e:
@@ -1790,7 +1980,7 @@ class ToolExecutor:
                 return {
                     "success": False,
                     "message": f"着色失败: {str(e)}",
-                    "output": feedback_text if feedback_text else str(e)
+                    "output": feedback_text if feedback_text else str(e),
                 }
 
         elif tool_name == "pymol_bg_color":
@@ -1802,7 +1992,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"背景颜色已设置为 {color}",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_zoom":
@@ -1815,7 +2005,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"视图已缩放到: {selection}",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_rotate":
@@ -1834,7 +2024,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"已旋转 {axis} 轴 {angle} 度",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_select":
@@ -1848,7 +2038,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"已创建选择集 '{name}'，包含 {count} 个原子",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_label":
@@ -1861,7 +2051,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"已为 {selection} 添加标签",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_ray":
@@ -1879,7 +2069,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": "光线追踪渲染完成",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_png":
@@ -1894,7 +2084,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"图像已保存到: {filename}",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_reset":
@@ -1902,11 +2092,7 @@ class ToolExecutor:
             cmd.reset()
             feedback = cmd._get_feedback()
             feedback_text = "\n".join(feedback) if feedback else ""
-            return {
-                "success": True,
-                "message": "视图已重置",
-                "output": feedback_text
-            }
+            return {"success": True, "message": "视图已重置", "output": feedback_text}
 
         elif tool_name == "pymol_center":
             selection = arguments.get("selection", "all")
@@ -1917,7 +2103,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"视图中心已移动到: {selection}",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_remove":
@@ -1929,7 +2115,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"已删除对象或选择集: {name}",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_set":
@@ -1948,7 +2134,7 @@ class ToolExecutor:
             return {
                 "success": True,
                 "message": f"已设置 {setting} = {value}",
-                "output": feedback_text
+                "output": feedback_text,
             }
 
         elif tool_name == "pymol_capture_view":
@@ -1964,7 +2150,9 @@ class ToolExecutor:
             height = min(max(height, 200), 1080)
 
             try:
-                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                with tempfile.NamedTemporaryFile(
+                    suffix=".png", delete=False
+                ) as tmp_file:
                     tmp_filename = tmp_file.name
 
                 cmd._get_feedback()
@@ -1977,10 +2165,10 @@ class ToolExecutor:
                 feedback = cmd._get_feedback()
                 feedback_text = "\n".join(feedback) if feedback else ""
 
-                with open(tmp_filename, 'rb') as f:
+                with open(tmp_filename, "rb") as f:
                     image_data = f.read()
 
-                image_base64 = base64.b64encode(image_data).decode('utf-8')
+                image_base64 = base64.b64encode(image_data).decode("utf-8")
 
                 try:
                     os.unlink(tmp_filename)
@@ -1993,27 +2181,22 @@ class ToolExecutor:
                     "image_data": image_base64,
                     "width": width,
                     "height": height,
-                    "format": "png"
+                    "format": "png",
                 }
 
             except Exception as e:
                 error_msg = f"捕获视图失败: {str(e)}"
                 feedback = cmd._get_feedback()
                 feedback_text = "\n".join(feedback) if feedback else ""
-                return {
-                    "success": False,
-                    "message": error_msg,
-                    "output": feedback_text
-                }
+                return {"success": False, "message": error_msg, "output": feedback_text}
 
         else:
             error_msg = f"未知工具: {tool_name}"
             print(f"[PyMOL AI Assistant] 错误: {error_msg}")
-            print(f"[PyMOL AI Assistant] 可用工具: {[t['function']['name'] for t in get_tool_definitions()]}")
-            return {
-                "success": False,
-                "message": error_msg
-            }
+            print(
+                f"[PyMOL AI Assistant] 可用工具: {[t['function']['name'] for t in get_tool_definitions()]}"
+            )
+            return {"success": False, "message": error_msg}
 
 
 # 工具描述导出（兼容旧代码）

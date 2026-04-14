@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-'''
+"""
 主模块 - 包含AI助手对话框主界面（深色主题）
-'''
+"""
 
 import os
 import sys
@@ -10,7 +10,17 @@ from datetime import datetime
 
 from pymol.Qt import QtCore, QtWidgets, QtGui
 
-from . import i18n, config, logger, ai_client, tools, get_update_info, __version__ as PLUGIN_VERSION, markdown_renderer, updater
+from . import (
+    i18n,
+    config,
+    logger,
+    ai_client,
+    tools,
+    get_update_info,
+    __version__ as PLUGIN_VERSION,
+    markdown_renderer,
+    updater,
+)
 
 
 # 版本号
@@ -19,37 +29,37 @@ __version__ = PLUGIN_VERSION
 
 # 颜色定义 - 深色主题
 COLORS = {
-    'bg_dark': '#2D2D2D',
-    'bg_darker': '#1E1E1E',
-    'bg_panel': '#404040',
-    'bg_input': '#4A4A4A',
-    'bg_message_user': '#2A3F2A',
-    'bg_message_ai': '#2A3A4A',
-    'bg_message_think': '#3A3A2A',
-    'bg_message_tool': '#2A2A3A',
-    'text_primary': '#FFFFFF',
-    'text_secondary': '#CCCCCC',
-    'text_muted': '#888888',
-    'accent_blue': '#5DADE2',
-    'accent_green': '#58D68D',
-    'accent_yellow': '#F5B041',
-    'accent_purple': '#AF7AC5',
-    'accent_cyan': '#5DDBE2',
-    'accent_red': '#E74C3C',
-    'border': '#555555',
+    "bg_dark": "#2D2D2D",
+    "bg_darker": "#1E1E1E",
+    "bg_panel": "#404040",
+    "bg_input": "#4A4A4A",
+    "bg_message_user": "#2A3F2A",
+    "bg_message_ai": "#2A3A4A",
+    "bg_message_think": "#3A3A2A",
+    "bg_message_tool": "#2A2A3A",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#CCCCCC",
+    "text_muted": "#888888",
+    "accent_blue": "#5DADE2",
+    "accent_green": "#58D68D",
+    "accent_yellow": "#F5B041",
+    "accent_purple": "#AF7AC5",
+    "accent_cyan": "#5DDBE2",
+    "accent_red": "#E74C3C",
+    "border": "#555555",
 }
 
 
 class StyledButton(QtWidgets.QPushButton):
     """自定义样式按钮"""
-    
+
     def __init__(self, text, parent=None, accent=False, danger=False):
         super().__init__(text, parent)
         self.accent = accent
         self.danger = danger
         self.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.update_style()
-    
+
     def update_style(self):
         if self.danger:
             self.setStyleSheet("""
@@ -116,7 +126,7 @@ class StyledButton(QtWidgets.QPushButton):
 
 class MessageWidget(QtWidgets.QFrame):
     """单条消息组件"""
-    
+
     def __init__(self, role, content, images=None, parent=None):
         super().__init__(parent)
         self.role = role
@@ -125,47 +135,49 @@ class MessageWidget(QtWidgets.QFrame):
         self.setObjectName("messageWidget")
         self.setup_ui()
         self.set_content(content, self.images)
-    
+
     def setup_ui(self):
         # 去掉边框
         self.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.setLineWidth(0)
-        
+
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(8)
         layout.setContentsMargins(15, 12, 15, 12)
-        
+
         # 角色标签
         role_text = {
-            'user': 'User',
-            'assistant': 'AI',
-            'thinking': i18n._('thinking'),
-            'tool': i18n._('using_tool'),
-            'tool_result': i18n._('tool_result'),
-            'tool_error': i18n._('tool_error'),
+            "user": "User",
+            "assistant": "AI",
+            "thinking": i18n._("thinking"),
+            "tool": i18n._("using_tool"),
+            "tool_result": i18n._("tool_result"),
+            "tool_error": i18n._("tool_error"),
         }.get(self.role, self.role)
-        
+
         self.role_label = QtWidgets.QLabel("<b>%s:</b>" % role_text)
-        
-        if self.role == 'user':
-            role_color = COLORS['accent_green']
-            self.bg_color = COLORS['bg_message_user']
-        elif self.role == 'assistant':
-            role_color = COLORS['accent_blue']
-            self.bg_color = COLORS['bg_message_ai']
-        elif self.role == 'thinking':
-            role_color = COLORS['accent_yellow']
-            self.bg_color = COLORS['bg_message_think']
-        elif self.role in ['tool', 'tool_result', 'tool_error']:
-            role_color = COLORS['accent_purple']
-            self.bg_color = COLORS['bg_message_tool']
+
+        if self.role == "user":
+            role_color = COLORS["accent_green"]
+            self.bg_color = COLORS["bg_message_user"]
+        elif self.role == "assistant":
+            role_color = COLORS["accent_blue"]
+            self.bg_color = COLORS["bg_message_ai"]
+        elif self.role == "thinking":
+            role_color = COLORS["accent_yellow"]
+            self.bg_color = COLORS["bg_message_think"]
+        elif self.role in ["tool", "tool_result", "tool_error"]:
+            role_color = COLORS["accent_purple"]
+            self.bg_color = COLORS["bg_message_tool"]
         else:
-            role_color = COLORS['text_primary']
-            self.bg_color = COLORS['bg_panel']
-        
-        self.role_label.setStyleSheet("color: %s; font-size: 14px; background: transparent;" % role_color)
+            role_color = COLORS["text_primary"]
+            self.bg_color = COLORS["bg_panel"]
+
+        self.role_label.setStyleSheet(
+            "color: %s; font-size: 14px; background: transparent;" % role_color
+        )
         layout.addWidget(self.role_label)
-        
+
         # 图片显示区域
         self.image_container = QtWidgets.QWidget()
         self.image_layout = QtWidgets.QHBoxLayout(self.image_container)
@@ -173,12 +185,14 @@ class MessageWidget(QtWidgets.QFrame):
         self.image_layout.setContentsMargins(0, 0, 0, 0)
         self.image_container.hide()
         layout.addWidget(self.image_container)
-        
+
         # 内容标签 - 设置为可复制
         self.content_label = QtWidgets.QLabel()
         self.content_label.setWordWrap(True)
         self.content_label.setTextFormat(QtCore.Qt.RichText)
-        self.content_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard)
+        self.content_label.setTextInteractionFlags(
+            QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard
+        )
         self.content_label.setCursor(QtGui.QCursor(QtCore.Qt.IBeamCursor))
         self.content_label.setStyleSheet("""
             QLabel {
@@ -192,31 +206,34 @@ class MessageWidget(QtWidgets.QFrame):
             }
         """)
         layout.addWidget(self.content_label)
-        
+
         # 设置背景 - 使用palette而不是stylesheet
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             #messageWidget {
                 background-color: %s;
                 border: none;
                 border-radius: 12px;
             }
-        """ % self.bg_color)
-    
+        """
+            % self.bg_color
+        )
+
     def set_content(self, content, images=None):
         """设置内容，支持不同颜色的文本和Markdown渲染"""
         self.raw_content = content
         self.images = images or []
 
-        if self.role == 'assistant':
+        if self.role == "assistant":
             html_content = markdown_renderer.MarkdownRenderer.render(content)
         else:
             html_content = self._format_text(content)
 
         self.content_label.setText(html_content)
-        
+
         # 显示图片
         self._display_images()
-    
+
     def _display_images(self):
         """显示图片"""
         # 清除现有图片
@@ -224,19 +241,20 @@ class MessageWidget(QtWidgets.QFrame):
             item = self.image_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        
+
         # 添加图片
         for img_data in self.images:
-            pixmap = img_data['pixmap']
+            pixmap = img_data["pixmap"]
             # 限制最大尺寸
             max_width = 300
             max_height = 200
             scaled_pixmap = pixmap.scaled(
-                max_width, max_height, 
-                QtCore.Qt.KeepAspectRatio, 
-                QtCore.Qt.SmoothTransformation
+                max_width,
+                max_height,
+                QtCore.Qt.KeepAspectRatio,
+                QtCore.Qt.SmoothTransformation,
             )
-            
+
             label = QtWidgets.QLabel()
             label.setPixmap(scaled_pixmap)
             label.setStyleSheet("""
@@ -248,30 +266,34 @@ class MessageWidget(QtWidgets.QFrame):
             """)
             label.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
             self.image_layout.addWidget(label)
-        
+
         self.image_container.setVisible(bool(self.images))
 
     def _format_text(self, text):
         """格式化普通文本，支持不同颜色的文本"""
-        escaped = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-        lines = escaped.split('\n')
+        lines = escaped.split("\n")
         formatted_lines = []
 
         for line in lines:
-            if line.strip().startswith('使用工具:') or line.strip().startswith('Using tool:'):
+            if line.strip().startswith("使用工具:") or line.strip().startswith(
+                "Using tool:"
+            ):
                 formatted_lines.append('<span style="color: #58D68D;">%s</span>' % line)
-            elif line.strip().startswith('思考:') or line.strip().startswith('Thinking:'):
+            elif line.strip().startswith("思考:") or line.strip().startswith(
+                "Thinking:"
+            ):
                 formatted_lines.append('<span style="color: #F5B041;">%s</span>' % line)
-            elif any(kw in line for kw in ['成功', '完成', 'success']):
+            elif any(kw in line for kw in ["成功", "完成", "success"]):
                 formatted_lines.append('<span style="color: #5DDBE2;">%s</span>' % line)
-            elif line.strip().startswith('错误:') or line.strip().startswith('Error:'):
+            elif line.strip().startswith("错误:") or line.strip().startswith("Error:"):
                 formatted_lines.append('<span style="color: #F07178;">%s</span>' % line)
             else:
                 formatted_lines.append(line)
 
-        return '<br>'.join(formatted_lines)
-    
+        return "<br>".join(formatted_lines)
+
     def append_content(self, text):
         """追加内容"""
         self.set_content(self.raw_content + text)
@@ -279,10 +301,10 @@ class MessageWidget(QtWidgets.QFrame):
 
 class ChatWidget(QtWidgets.QWidget):
     """聊天标签页"""
-    
+
     message_sent = QtCore.Signal(str, list)
     stop_requested = QtCore.Signal()
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.messages = []
@@ -294,12 +316,12 @@ class ChatWidget(QtWidgets.QWidget):
         self.loading_timer.timeout.connect(self._update_loading_animation)
         self.current_images = []
         self.setup_ui()
-    
+
     def setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
-        
+
         # 消息显示区域（带圆角面板）- 使用bg_panel颜色，无边框
         self.chat_panel = QtWidgets.QFrame()
         self.chat_panel.setStyleSheet("""
@@ -309,22 +331,22 @@ class ChatWidget(QtWidgets.QWidget):
                 border: none;
             }
         """)
-        
+
         chat_layout = QtWidgets.QVBoxLayout(self.chat_panel)
         chat_layout.setContentsMargins(10, 10, 10, 10)
         chat_layout.setSpacing(8)
-        
+
         # 清除按钮
         clear_layout = QtWidgets.QHBoxLayout()
         clear_layout.addStretch()
-        
-        self.clear_btn = StyledButton(i18n._('clear_chat'))
+
+        self.clear_btn = StyledButton(i18n._("clear_chat"))
         self.clear_btn.setFixedSize(85, 30)
         self.clear_btn.clicked.connect(self.clear_chat)
         clear_layout.addWidget(self.clear_btn)
-        
+
         chat_layout.addLayout(clear_layout)
-        
+
         # 消息滚动区域
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
@@ -349,7 +371,7 @@ class ChatWidget(QtWidgets.QWidget):
                 background: #888888;
             }
         """)
-        
+
         # 消息容器 - 使用透明背景
         self.messages_container = QtWidgets.QWidget()
         self.messages_container.setStyleSheet("background: transparent;")
@@ -357,15 +379,15 @@ class ChatWidget(QtWidgets.QWidget):
         self.messages_layout.setSpacing(10)
         self.messages_layout.setContentsMargins(5, 5, 5, 5)
         self.messages_layout.addStretch()
-        
+
         # 创建加载指示器（始终在底部）
         self._create_loading_indicator()
-        
+
         scroll.setWidget(self.messages_container)
         chat_layout.addWidget(scroll)
-        
+
         layout.addWidget(self.chat_panel, stretch=1)
-        
+
         # 输入区域面板
         self.input_panel = QtWidgets.QFrame()
         self.input_panel.setStyleSheet("""
@@ -375,11 +397,11 @@ class ChatWidget(QtWidgets.QWidget):
                 border: none;
             }
         """)
-        
+
         input_layout = QtWidgets.QVBoxLayout(self.input_panel)
         input_layout.setContentsMargins(15, 12, 15, 12)
         input_layout.setSpacing(8)
-        
+
         # 图片预览区域
         self.image_preview_container = QtWidgets.QWidget()
         self.image_preview_layout = QtWidgets.QHBoxLayout(self.image_preview_container)
@@ -387,13 +409,13 @@ class ChatWidget(QtWidgets.QWidget):
         self.image_preview_layout.setSpacing(5)
         self.image_preview_container.hide()
         input_layout.addWidget(self.image_preview_container)
-        
+
         # 输入框和图片导入按钮的水平布局
         input_row_layout = QtWidgets.QHBoxLayout()
-        
+
         # 输入框
         self.input_text = QtWidgets.QTextEdit()
-        self.input_text.setPlaceholderText(i18n._('input_placeholder'))
+        self.input_text.setPlaceholderText(i18n._("input_placeholder"))
         self.input_text.setMaximumHeight(80)
         self.input_text.setStyleSheet("""
             QTextEdit {
@@ -408,7 +430,7 @@ class ChatWidget(QtWidgets.QWidget):
             }
         """)
         input_row_layout.addWidget(self.input_text)
-        
+
         # 图片导入按钮
         self.image_btn = QtWidgets.QPushButton()
         self.image_btn.setFixedSize(40, 40)
@@ -433,32 +455,35 @@ class ChatWidget(QtWidgets.QWidget):
         self.image_btn.setText("🖼️")
         self.image_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.image_btn.clicked.connect(self.import_image)
-        self.image_btn.setToolTip(i18n._('import_image'))
+        self.image_btn.setToolTip(i18n._("import_image"))
         input_row_layout.addWidget(self.image_btn)
-        
+
         input_layout.addLayout(input_row_layout)
-        
+
         # 发送按钮（右下角）
         btn_layout = QtWidgets.QHBoxLayout()
         btn_layout.addStretch()
-        
-        self.send_btn = StyledButton(i18n._('send_button'), accent=True)
+
+        self.send_btn = StyledButton(i18n._("send_button"), accent=True)
         self.send_btn.setFixedSize(100, 40)
         self.send_btn.clicked.connect(self.on_send_clicked)
         btn_layout.addWidget(self.send_btn)
-        
+
         input_layout.addLayout(btn_layout)
-        
+
         layout.addWidget(self.input_panel)
-        
+
         # 事件过滤器
         self.input_text.installEventFilter(self)
-    
+
     def eventFilter(self, obj, event):
         if obj == self.input_text:
             event_type = event.type()
             if event_type == QtCore.QEvent.Type.KeyPress:
-                if event.key() == QtCore.Qt.Key_Return and not event.modifiers() & QtCore.Qt.ShiftModifier:
+                if (
+                    event.key() == QtCore.Qt.Key_Return
+                    and not event.modifiers() & QtCore.Qt.ShiftModifier
+                ):
                     self.on_send_clicked()
                     return True
             elif event_type == 6:
@@ -467,62 +492,65 @@ class ChatWidget(QtWidgets.QWidget):
                     self.handle_pasted_image(mime_data.imageData())
                     return True
         return super().eventFilter(obj, event)
-    
+
     def on_send_clicked(self):
         """发送按钮点击"""
         if self.is_streaming:
             self.stop_requested.emit()
             return
-        
+
         text = self.input_text.toPlainText().strip()
         if text or self.current_images:
             # 在清空 current_images 之前，先创建副本用于发送
             images_to_send = list(self.current_images)
-            
-            self.add_message('user', text, self.current_images)
+
+            self.add_message("user", text, self.current_images)
             self.input_text.clear()
             self.clear_images()
             self.message_sent.emit(text, images_to_send)
             self.set_streaming_state(True)
-    
+
     def import_image(self):
         """导入图片"""
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, i18n._('import_image'), "", 
-            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
+            self,
+            i18n._("import_image"),
+            "",
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.webp)",
         )
         if filename:
             pixmap = QtGui.QPixmap(filename)
             if not pixmap.isNull():
                 self.add_image_to_current(pixmap)
-    
+
     def handle_pasted_image(self, image_data):
         """处理粘贴的图片"""
         if isinstance(image_data, QtGui.QPixmap):
             if not image_data.isNull():
                 self.add_image_to_current(image_data)
-    
+
     def add_image_to_current(self, pixmap):
         """添加图片到当前图片列表"""
         # 缩放图片以适应预览
-        scaled_pixmap = pixmap.scaled(100, 100, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
-        
+        scaled_pixmap = pixmap.scaled(
+            100, 100, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation
+        )
+
         # 保存原始图片数据（使用原图，不要用预览图）
         import base64
+
         buffer = QtCore.QBuffer()
         buffer.open(QtCore.QIODevice.WriteOnly)
-        pixmap.save(buffer, 'PNG')
+        pixmap.save(buffer, "PNG")
         image_base64 = bytes(buffer.data())
         buffer.close()
-        
-        self.current_images.append({
-            'pixmap': pixmap,
-            'preview': scaled_pixmap,
-            'data': image_base64
-        })
-        
+
+        self.current_images.append(
+            {"pixmap": pixmap, "preview": scaled_pixmap, "data": image_base64}
+        )
+
         self.update_image_preview()
-    
+
     def update_image_preview(self):
         """更新图片预览"""
         # 清除现有预览
@@ -530,11 +558,11 @@ class ChatWidget(QtWidgets.QWidget):
             item = self.image_preview_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        
+
         # 添加图片预览
         for i, img_data in enumerate(self.current_images):
             label = QtWidgets.QLabel()
-            label.setPixmap(img_data['preview'])
+            label.setPixmap(img_data["preview"])
             label.setStyleSheet("""
                 QLabel {
                     border: 1px solid #555555;
@@ -542,14 +570,14 @@ class ChatWidget(QtWidgets.QWidget):
                     padding: 2px;
                 }
             """)
-            
+
             # 添加删除按钮
             container = QtWidgets.QWidget()
             container.setStyleSheet("background: transparent;")
             container_layout = QtWidgets.QVBoxLayout(container)
             container_layout.setContentsMargins(0, 0, 0, 0)
             container_layout.setSpacing(2)
-            
+
             delete_btn = QtWidgets.QPushButton("×")
             delete_btn.setFixedSize(20, 20)
             delete_btn.setStyleSheet("""
@@ -566,7 +594,7 @@ class ChatWidget(QtWidgets.QWidget):
                 }
             """)
             delete_btn.clicked.connect(lambda idx=i: self.remove_image(idx))
-            
+
             wrapper = QtWidgets.QWidget()
             wrapper.setStyleSheet("background: transparent;")
             wrapper_layout = QtWidgets.QVBoxLayout(wrapper)
@@ -574,72 +602,74 @@ class ChatWidget(QtWidgets.QWidget):
             wrapper_layout.setSpacing(0)
             wrapper_layout.addWidget(label)
             wrapper_layout.addWidget(delete_btn, alignment=QtCore.Qt.AlignRight)
-            
+
             self.image_preview_layout.addWidget(wrapper)
-        
+
         self.image_preview_container.setVisible(bool(self.current_images))
-    
+
     def remove_image(self, index):
         """移除图片"""
         if 0 <= index < len(self.current_images):
             del self.current_images[index]
             self.update_image_preview()
-    
+
     def clear_images(self):
         """清除所有图片"""
         self.current_images.clear()
         self.update_image_preview()
-    
+
     def update_vision_mode(self, is_vision_model):
         """根据配置更新视觉模式"""
         self.image_btn.setVisible(is_vision_model)
-        
+
         # 如果不是视觉模式，清除当前图片
         if not is_vision_model and self.current_images:
             self.clear_images()
-    
+
     def set_streaming_state(self, streaming):
         """设置流式状态"""
         self.is_streaming = streaming
         if streaming:
-            self.send_btn.setText(i18n._('stop_button'))
+            self.send_btn.setText(i18n._("stop_button"))
             self.send_btn.accent = False
             self.send_btn.danger = True
             self.send_btn.update_style()
         else:
-            self.send_btn.setText(i18n._('send_button'))
+            self.send_btn.setText(i18n._("send_button"))
             self.send_btn.accent = True
             self.send_btn.danger = False
             self.send_btn.update_style()
-    
+
     def _update_loading_animation(self):
         """更新加载动画 - 旋转指示器"""
-        spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        spinner_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         self.loading_dots = (self.loading_dots + 1) % len(spinner_chars)
         spinner = spinner_chars[self.loading_dots]
-        
-        loading_text = "%s %s" % (spinner, i18n._('loading'))
+
+        loading_text = "%s %s" % (spinner, i18n._("loading"))
         self.loading_indicator.set_content(loading_text)
-    
+
     def _create_loading_indicator(self):
         """创建加载指示器（始终在底部）"""
-        self.loading_indicator = MessageWidget('thinking', i18n._('loading'))
+        self.loading_indicator = MessageWidget("thinking", i18n._("loading"))
         self.loading_indicator.hide()
         # 插入到 stretch 之前（最后一个位置）
-        self.messages_layout.insertWidget(self.messages_layout.count() - 1, self.loading_indicator)
-    
+        self.messages_layout.insertWidget(
+            self.messages_layout.count() - 1, self.loading_indicator
+        )
+
     def show_loading(self):
         """显示加载指示器"""
         self.loading_indicator.show()
         self.loading_dots = 0
         self.loading_timer.start(80)
         self.scroll_to_bottom()
-    
+
     def hide_loading(self):
         """隐藏加载指示器"""
         self.loading_timer.stop()
         self.loading_indicator.hide()
-    
+
     def add_message(self, role, content, images=None):
         """添加消息 - 插入到加载指示器之前"""
         msg_widget = MessageWidget(role, content, images)
@@ -648,58 +678,57 @@ class ChatWidget(QtWidgets.QWidget):
         if insert_pos < 0:
             insert_pos = 0
         self.messages_layout.insertWidget(insert_pos, msg_widget)
-        self.messages.append({'role': role, 'widget': msg_widget, 'images': images})
+        self.messages.append({"role": role, "widget": msg_widget, "images": images})
         self.current_message_widget = msg_widget
         self.scroll_to_bottom()
         return msg_widget
-    
+
     def start_message(self, role):
         """开始一条新消息"""
-        self.current_message_widget = self.add_message(role, '')
+        self.current_message_widget = self.add_message(role, "")
         return self.current_message_widget
-    
+
     def append_to_current(self, text):
         """追加到当前消息"""
         if self.current_message_widget:
             self.current_message_widget.append_content(text)
             self.scroll_to_bottom()
-    
+
     def scroll_to_bottom(self):
         """滚动到底部"""
         QtCore.QTimer.singleShot(50, self._do_scroll)
-    
+
     def _do_scroll(self):
         if self.messages_container.parent():
             scroll = self.messages_container.parent().parent()
             if isinstance(scroll, QtWidgets.QScrollArea):
                 scrollbar = scroll.verticalScrollBar()
                 scrollbar.setValue(scrollbar.maximum())
-    
+
     def clear_chat(self):
         """清空对话"""
         reply = QtWidgets.QMessageBox.question(
             self,
-            i18n._('clear_chat'),
-            i18n._('confirm_clear_chat'),
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+            i18n._("clear_chat"),
+            i18n._("confirm_clear_chat"),
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
         )
-        
+
         if reply == QtWidgets.QMessageBox.Yes:
             for msg in self.messages:
-                msg['widget'].deleteLater()
+                msg["widget"].deleteLater()
             self.messages.clear()
             self.current_message_widget = None
-    
+
     def get_messages_for_api(self):
         """获取API用的消息历史"""
         api_messages = []
         for msg in self.messages:
-            role = msg['role']
-            if role in ['user', 'assistant']:
-                api_messages.append({
-                    'role': role,
-                    'content': msg['widget'].raw_content
-                })
+            role = msg["role"]
+            if role in ["user", "assistant"]:
+                api_messages.append(
+                    {"role": role, "content": msg["widget"].raw_content}
+                )
         return api_messages
 
 
@@ -717,39 +746,39 @@ class ConfigWidget(QtWidgets.QWidget):
 
     def update_language(self):
         """更新界面语言"""
-        if hasattr(self, 'labels'):
-            self.labels.get('list_label').setText(i18n._('saved_configs'))
-            self.labels.get('name_label').setText(i18n._('name'))
-            self.labels.get('provider_label').setText(i18n._('provider'))
-            self.labels.get('url_label').setText(i18n._('api_url'))
-            self.labels.get('key_label').setText(i18n._('api_key'))
-            self.labels.get('model_label').setText(i18n._('model'))
-            self.labels.get('version_label').setText(i18n._('api_version'))
-            self.labels.get('temp_label').setText(i18n._('temperature'))
-            self.labels.get('tokens_label').setText(i18n._('max_tokens'))
-            self.labels.get('timeout_label').setText(i18n._('timeout'))
+        if hasattr(self, "labels"):
+            self.labels.get("list_label").setText(i18n._("saved_configs"))
+            self.labels.get("name_label").setText(i18n._("name"))
+            self.labels.get("provider_label").setText(i18n._("provider"))
+            self.labels.get("url_label").setText(i18n._("api_url"))
+            self.labels.get("key_label").setText(i18n._("api_key"))
+            self.labels.get("model_label").setText(i18n._("model"))
+            self.labels.get("version_label").setText(i18n._("api_version"))
+            self.labels.get("temp_label").setText(i18n._("temperature"))
+            self.labels.get("tokens_label").setText(i18n._("max_tokens"))
+            self.labels.get("timeout_label").setText(i18n._("timeout"))
 
-        if hasattr(self, 'reasoning_checkbox'):
-            self.reasoning_checkbox.setText(i18n._('reasoning_model'))
-        if hasattr(self, 'vision_checkbox'):
-            self.vision_checkbox.setText(i18n._('vision_model'))
-        if hasattr(self, 'current_checkbox'):
-            self.current_checkbox.setText(i18n._('set_as_current'))
-        if hasattr(self, 'advanced_toggle'):
-            self.advanced_toggle.setText(i18n._('show_advanced'))
+        if hasattr(self, "reasoning_checkbox"):
+            self.reasoning_checkbox.setText(i18n._("reasoning_model"))
+        if hasattr(self, "vision_checkbox"):
+            self.vision_checkbox.setText(i18n._("vision_model"))
+        if hasattr(self, "current_checkbox"):
+            self.current_checkbox.setText(i18n._("set_as_current"))
+        if hasattr(self, "advanced_toggle"):
+            self.advanced_toggle.setText(i18n._("show_advanced"))
 
-        if hasattr(self, 'new_btn'):
-            self.new_btn.setText(i18n._('new_button'))
-        if hasattr(self, 'save_btn'):
-            self.save_btn.setText(i18n._('save_button'))
-        if hasattr(self, 'delete_btn'):
-            self.delete_btn.setText(i18n._('delete_button'))
-        if hasattr(self, 'test_btn'):
-            self.test_btn.setText(i18n._('test_connection'))
-        if hasattr(self, 'import_btn'):
-            self.import_btn.setText(i18n._('import_button'))
-        if hasattr(self, 'export_btn'):
-            self.export_btn.setText(i18n._('export_button'))
+        if hasattr(self, "new_btn"):
+            self.new_btn.setText(i18n._("new_button"))
+        if hasattr(self, "save_btn"):
+            self.save_btn.setText(i18n._("save_button"))
+        if hasattr(self, "delete_btn"):
+            self.delete_btn.setText(i18n._("delete_button"))
+        if hasattr(self, "test_btn"):
+            self.test_btn.setText(i18n._("test_connection"))
+        if hasattr(self, "import_btn"):
+            self.import_btn.setText(i18n._("import_button"))
+        if hasattr(self, "export_btn"):
+            self.export_btn.setText(i18n._("export_button"))
 
         self.update_provider_combo()
         self.load_configs()
@@ -761,7 +790,7 @@ class ConfigWidget(QtWidgets.QWidget):
         self.provider_combo.clear()
         for provider_id in config.get_provider_list():
             provider_info = config.get_provider_info(provider_id)
-            self.provider_combo.addItem(provider_info['name'], provider_id)
+            self.provider_combo.addItem(provider_info["name"], provider_id)
         idx = self.provider_combo.findData(current_provider)
         if idx >= 0:
             self.provider_combo.setCurrentIndex(idx)
@@ -784,10 +813,10 @@ class ConfigWidget(QtWidgets.QWidget):
         panel_layout.setContentsMargins(25, 20, 25, 20)
         panel_layout.setSpacing(12)
 
-        self.labels['list_label'] = QtWidgets.QLabel(i18n._('saved_configs'))
-        self.labels['list_label'].setStyleSheet("color: #CCCCCC; font-size: 14px;")
-        panel_layout.addWidget(self.labels['list_label'])
-        
+        self.labels["list_label"] = QtWidgets.QLabel(i18n._("saved_configs"))
+        self.labels["list_label"].setStyleSheet("color: #CCCCCC; font-size: 14px;")
+        panel_layout.addWidget(self.labels["list_label"])
+
         self.config_list = QtWidgets.QListWidget()
         self.config_list.setMaximumHeight(80)
         self.config_list.setStyleSheet("""
@@ -813,7 +842,7 @@ class ConfigWidget(QtWidgets.QWidget):
         """)
         self.config_list.itemClicked.connect(self.on_config_selected)
         panel_layout.addWidget(self.config_list)
-        
+
         line_style = """
             QLineEdit {
                 background-color: #4A4A4A;
@@ -831,7 +860,7 @@ class ConfigWidget(QtWidgets.QWidget):
                 color: #888888;
             }
         """
-        
+
         combo_style = """
             QComboBox {
                 background-color: #4A4A4A;
@@ -865,71 +894,71 @@ class ConfigWidget(QtWidgets.QWidget):
                 color: #888888;
             }
         """
-        
+
         form_layout = QtWidgets.QGridLayout()
         form_layout.setSpacing(10)
         form_layout.setColumnStretch(1, 1)
-        
+
         row = 0
-        self.labels['name_label'] = QtWidgets.QLabel(i18n._('name'))
-        self.labels['name_label'].setStyleSheet("color: #CCCCCC; font-size: 13px;")
+        self.labels["name_label"] = QtWidgets.QLabel(i18n._("name"))
+        self.labels["name_label"].setStyleSheet("color: #CCCCCC; font-size: 13px;")
         self.name_edit = QtWidgets.QLineEdit()
         self.name_edit.setPlaceholderText("e.g., My GPT-4")
         self.name_edit.setStyleSheet(line_style)
-        form_layout.addWidget(self.labels['name_label'], row, 0)
+        form_layout.addWidget(self.labels["name_label"], row, 0)
         form_layout.addWidget(self.name_edit, row, 1)
-        
+
         row += 1
-        self.labels['provider_label'] = QtWidgets.QLabel(i18n._('provider'))
-        self.labels['provider_label'].setStyleSheet("color: #CCCCCC; font-size: 13px;")
+        self.labels["provider_label"] = QtWidgets.QLabel(i18n._("provider"))
+        self.labels["provider_label"].setStyleSheet("color: #CCCCCC; font-size: 13px;")
         self.provider_combo = QtWidgets.QComboBox()
         self.provider_combo.setStyleSheet(combo_style)
         for provider_id in config.get_provider_list():
             provider_info = config.get_provider_info(provider_id)
-            self.provider_combo.addItem(provider_info['name'], provider_id)
+            self.provider_combo.addItem(provider_info["name"], provider_id)
         self.provider_combo.currentIndexChanged.connect(self.on_provider_changed)
-        form_layout.addWidget(self.labels['provider_label'], row, 0)
+        form_layout.addWidget(self.labels["provider_label"], row, 0)
         form_layout.addWidget(self.provider_combo, row, 1)
 
         row += 1
-        self.labels['model_label'] = QtWidgets.QLabel(i18n._('model'))
-        self.labels['model_label'].setStyleSheet("color: #CCCCCC; font-size: 13px;")
+        self.labels["model_label"] = QtWidgets.QLabel(i18n._("model"))
+        self.labels["model_label"].setStyleSheet("color: #CCCCCC; font-size: 13px;")
         self.model_combo = QtWidgets.QComboBox()
         self.model_combo.setEditable(True)
         self.model_combo.setStyleSheet(combo_style)
-        form_layout.addWidget(self.labels['model_label'], row, 0)
+        form_layout.addWidget(self.labels["model_label"], row, 0)
         form_layout.addWidget(self.model_combo, row, 1)
 
         row += 1
-        self.labels['url_label'] = QtWidgets.QLabel(i18n._('api_url'))
-        self.labels['url_label'].setStyleSheet("color: #CCCCCC; font-size: 13px;")
+        self.labels["url_label"] = QtWidgets.QLabel(i18n._("api_url"))
+        self.labels["url_label"].setStyleSheet("color: #CCCCCC; font-size: 13px;")
         self.url_edit = QtWidgets.QLineEdit()
-        self.url_edit.setPlaceholderText(i18n._('api_url_placeholder'))
+        self.url_edit.setPlaceholderText(i18n._("api_url_placeholder"))
         self.url_edit.setStyleSheet(line_style)
-        form_layout.addWidget(self.labels['url_label'], row, 0)
+        form_layout.addWidget(self.labels["url_label"], row, 0)
         form_layout.addWidget(self.url_edit, row, 1)
 
         row += 1
-        self.labels['key_label'] = QtWidgets.QLabel(i18n._('api_key'))
-        self.labels['key_label'].setStyleSheet("color: #CCCCCC; font-size: 13px;")
+        self.labels["key_label"] = QtWidgets.QLabel(i18n._("api_key"))
+        self.labels["key_label"].setStyleSheet("color: #CCCCCC; font-size: 13px;")
         self.key_edit = QtWidgets.QLineEdit()
-        self.key_edit.setPlaceholderText(i18n._('api_key_placeholder'))
+        self.key_edit.setPlaceholderText(i18n._("api_key_placeholder"))
         self.key_edit.setEchoMode(QtWidgets.QLineEdit.Password)
         self.key_edit.setStyleSheet(line_style)
-        form_layout.addWidget(self.labels['key_label'], row, 0)
+        form_layout.addWidget(self.labels["key_label"], row, 0)
         form_layout.addWidget(self.key_edit, row, 1)
 
         row += 1
-        self.labels['version_label'] = QtWidgets.QLabel(i18n._('api_version'))
-        self.labels['version_label'].setStyleSheet("color: #CCCCCC; font-size: 13px;")
+        self.labels["version_label"] = QtWidgets.QLabel(i18n._("api_version"))
+        self.labels["version_label"].setStyleSheet("color: #CCCCCC; font-size: 13px;")
         self.version_edit = QtWidgets.QLineEdit()
-        self.version_edit.setPlaceholderText(i18n._('api_version_placeholder'))
+        self.version_edit.setPlaceholderText(i18n._("api_version_placeholder"))
         self.version_edit.setStyleSheet(line_style)
-        form_layout.addWidget(self.labels['version_label'], row, 0)
+        form_layout.addWidget(self.labels["version_label"], row, 0)
         form_layout.addWidget(self.version_edit, row, 1)
-        
+
         panel_layout.addLayout(form_layout)
-        
+
         checkbox_style = """
             QCheckBox {
                 color: #CCCCCC;
@@ -947,24 +976,24 @@ class ConfigWidget(QtWidgets.QWidget):
                 background-color: #5DADE2;
             }
         """
-        
-        self.reasoning_checkbox = QtWidgets.QCheckBox(i18n._('reasoning_model'))
+
+        self.reasoning_checkbox = QtWidgets.QCheckBox(i18n._("reasoning_model"))
         self.reasoning_checkbox.setStyleSheet(checkbox_style)
         form_layout.addWidget(self.reasoning_checkbox, row, 0, 1, 2)
-        
+
         row += 1
-        self.vision_checkbox = QtWidgets.QCheckBox(i18n._('vision_model'))
+        self.vision_checkbox = QtWidgets.QCheckBox(i18n._("vision_model"))
         self.vision_checkbox.setStyleSheet(checkbox_style)
         form_layout.addWidget(self.vision_checkbox, row, 0, 1, 2)
-        
+
         row += 1
-        self.current_checkbox = QtWidgets.QCheckBox(i18n._('set_as_current'))
+        self.current_checkbox = QtWidgets.QCheckBox(i18n._("set_as_current"))
         self.current_checkbox.setStyleSheet(checkbox_style)
         form_layout.addWidget(self.current_checkbox, row, 0, 1, 2)
-        
+
         panel_layout.addLayout(form_layout)
 
-        self.advanced_toggle = QtWidgets.QPushButton(i18n._('show_advanced'))
+        self.advanced_toggle = QtWidgets.QPushButton(i18n._("show_advanced"))
         self.advanced_toggle.setStyleSheet("""
             QPushButton {
                 background: transparent;
@@ -986,7 +1015,7 @@ class ConfigWidget(QtWidgets.QWidget):
         advanced_layout = QtWidgets.QGridLayout(self.advanced_frame)
         advanced_layout.setSpacing(8)
         advanced_layout.setColumnStretch(1, 1)
-        
+
         spin_style = """
             QSpinBox, QDoubleSpinBox {
                 background-color: #4A4A4A;
@@ -997,231 +1026,231 @@ class ConfigWidget(QtWidgets.QWidget):
                 font-size: 12px;
             }
         """
-        
-        self.labels['temp_label'] = QtWidgets.QLabel(i18n._('temperature'))
-        self.labels['temp_label'].setStyleSheet("color: #AAAAAA; font-size: 12px;")
+
+        self.labels["temp_label"] = QtWidgets.QLabel(i18n._("temperature"))
+        self.labels["temp_label"].setStyleSheet("color: #AAAAAA; font-size: 12px;")
         self.temp_spin = QtWidgets.QDoubleSpinBox()
         self.temp_spin.setRange(0.0, 2.0)
         self.temp_spin.setSingleStep(0.1)
         self.temp_spin.setValue(0.7)
         self.temp_spin.setStyleSheet(spin_style)
-        advanced_layout.addWidget(self.labels['temp_label'], 0, 0)
+        advanced_layout.addWidget(self.labels["temp_label"], 0, 0)
         advanced_layout.addWidget(self.temp_spin, 0, 1)
 
-        self.labels['tokens_label'] = QtWidgets.QLabel(i18n._('max_tokens'))
-        self.labels['tokens_label'].setStyleSheet("color: #AAAAAA; font-size: 12px;")
+        self.labels["tokens_label"] = QtWidgets.QLabel(i18n._("max_tokens"))
+        self.labels["tokens_label"].setStyleSheet("color: #AAAAAA; font-size: 12px;")
         self.max_tokens_spin = QtWidgets.QSpinBox()
-        self.max_tokens_spin.setRange(100, 128000)
+        self.max_tokens_spin.setRange(100, 200000)
         self.max_tokens_spin.setSingleStep(100)
-        self.max_tokens_spin.setValue(4096)
+        self.max_tokens_spin.setValue(200000)
         self.max_tokens_spin.setStyleSheet(spin_style)
-        advanced_layout.addWidget(self.labels['tokens_label'], 1, 0)
+        advanced_layout.addWidget(self.labels["tokens_label"], 1, 0)
         advanced_layout.addWidget(self.max_tokens_spin, 1, 1)
 
-        self.labels['timeout_label'] = QtWidgets.QLabel(i18n._('timeout'))
-        self.labels['timeout_label'].setStyleSheet("color: #AAAAAA; font-size: 12px;")
+        self.labels["timeout_label"] = QtWidgets.QLabel(i18n._("timeout"))
+        self.labels["timeout_label"].setStyleSheet("color: #AAAAAA; font-size: 12px;")
         self.timeout_spin = QtWidgets.QSpinBox()
         self.timeout_spin.setRange(10, 600)
         self.timeout_spin.setSingleStep(10)
         self.timeout_spin.setValue(60)
         self.timeout_spin.setStyleSheet(spin_style)
-        advanced_layout.addWidget(self.labels['timeout_label'], 2, 0)
+        advanced_layout.addWidget(self.labels["timeout_label"], 2, 0)
         advanced_layout.addWidget(self.timeout_spin, 2, 1)
-        
+
         self.advanced_frame.hide()
         panel_layout.addWidget(self.advanced_frame)
-        
+
         btn_layout = QtWidgets.QHBoxLayout()
         btn_layout.setSpacing(8)
-        
-        self.new_btn = StyledButton(i18n._('new_button'))
+
+        self.new_btn = StyledButton(i18n._("new_button"))
         self.new_btn.clicked.connect(self.on_new)
         btn_layout.addWidget(self.new_btn)
-        
-        self.save_btn = StyledButton(i18n._('save_button'))
+
+        self.save_btn = StyledButton(i18n._("save_button"))
         self.save_btn.clicked.connect(self.on_save)
         btn_layout.addWidget(self.save_btn)
-        
-        self.delete_btn = StyledButton(i18n._('delete_button'))
+
+        self.delete_btn = StyledButton(i18n._("delete_button"))
         self.delete_btn.clicked.connect(self.on_delete)
         btn_layout.addWidget(self.delete_btn)
-        
+
         btn_layout.addStretch()
-        
-        self.test_btn = StyledButton(i18n._('test_connection'))
+
+        self.test_btn = StyledButton(i18n._("test_connection"))
         self.test_btn.clicked.connect(self.on_test)
         btn_layout.addWidget(self.test_btn)
-        
+
         panel_layout.addLayout(btn_layout)
-        
+
         io_layout = QtWidgets.QHBoxLayout()
         io_layout.setSpacing(8)
-        
-        self.import_btn = StyledButton(i18n._('import_button'))
+
+        self.import_btn = StyledButton(i18n._("import_button"))
         self.import_btn.clicked.connect(self.on_import)
         io_layout.addWidget(self.import_btn)
-        
-        self.export_btn = StyledButton(i18n._('export_button'))
+
+        self.export_btn = StyledButton(i18n._("export_button"))
         self.export_btn.clicked.connect(self.on_export)
         io_layout.addWidget(self.export_btn)
-        
+
         io_layout.addStretch()
         panel_layout.addLayout(io_layout)
-        
+
         main_layout.addWidget(panel)
         main_layout.addStretch()
 
         self.on_provider_changed(0)
-    
+
     def toggle_advanced(self):
         """切换高级设置显示"""
         if self.advanced_frame.isVisible():
             self.advanced_frame.hide()
-            self.advanced_toggle.setText(i18n._('show_advanced'))
+            self.advanced_toggle.setText(i18n._("show_advanced"))
         else:
             self.advanced_frame.show()
-            self.advanced_toggle.setText(i18n._('hide_advanced'))
-    
+            self.advanced_toggle.setText(i18n._("hide_advanced"))
+
     def on_provider_changed(self, index):
         """提供商改变时更新模型列表和表单"""
         provider_id = self.provider_combo.currentData()
         if not provider_id:
             return
-            
+
         provider_info = config.get_provider_info(provider_id)
-        
+
         self.model_combo.blockSignals(True)
         self.model_combo.clear()
-        models = provider_info.get('models', [])
+        models = provider_info.get("models", [])
         for model in models:
             self.model_combo.addItem(model)
         self.model_combo.blockSignals(False)
-        
-        default_url = provider_info.get('api_base', '')
+
+        default_url = provider_info.get("api_base", "")
         if default_url:
             self.url_edit.setText(default_url)
-        
-        requires_key = provider_info.get('requires_api_key', True)
-        requires_base = provider_info.get('requires_api_base', False)
-        requires_version = provider_info.get('requires_api_version', False)
-        
+
+        requires_key = provider_info.get("requires_api_key", True)
+        requires_base = provider_info.get("requires_api_base", False)
+        requires_version = provider_info.get("requires_api_version", False)
+
         self.key_edit.setEnabled(requires_key)
         if not requires_key:
             self.key_edit.setText("not-required")
         elif self.key_edit.text() == "not-required":
             self.key_edit.clear()
-        
-        self.url_edit.setEnabled(requires_base or provider_id == 'custom')
+
+        self.url_edit.setEnabled(requires_base or provider_id == "custom")
         self.version_edit.setEnabled(requires_version)
         self.version_edit.setVisible(requires_version)
-        self.labels['version_label'].setVisible(requires_version)
-    
+        self.labels["version_label"].setVisible(requires_version)
+
     def load_configs(self):
         self.config_list.clear()
         current = config.config_manager.get_current_config()
-        current_name = current.get('name') if current else None
-        
+        current_name = current.get("name") if current else None
+
         for cfg in config.config_manager.get_all_configs():
-            name = cfg.get('name', '')
+            name = cfg.get("name", "")
             display = name
             if name == current_name:
-                display = "%s %s" % (name, i18n._('current_use'))
+                display = "%s %s" % (name, i18n._("current_use"))
             self.config_list.addItem(display)
-        
+
         if current_name:
             self.load_config_to_form(current)
-    
+
     def on_config_selected(self, item):
-        name = item.text().replace(" %s" % i18n._('current_use'), "")
+        name = item.text().replace(" %s" % i18n._("current_use"), "")
         cfg = config.config_manager.get_config(name)
         if cfg:
             self.load_config_to_form(cfg)
-    
+
     def load_config_to_form(self, cfg):
-        self.current_config_name = cfg.get('name')
-        self.name_edit.setText(cfg.get('name', ''))
-        
-        provider_id = cfg.get('provider', 'custom')
+        self.current_config_name = cfg.get("name")
+        self.name_edit.setText(cfg.get("name", ""))
+
+        provider_id = cfg.get("provider", "custom")
         idx = self.provider_combo.findData(provider_id)
         if idx >= 0:
             self.provider_combo.setCurrentIndex(idx)
-        
-        self.url_edit.setText(cfg.get('api_url', ''))
-        self.key_edit.setText(cfg.get('api_key', ''))
-        
-        model = cfg.get('model', '')
+
+        self.url_edit.setText(cfg.get("api_url", ""))
+        self.key_edit.setText(cfg.get("api_key", ""))
+
+        model = cfg.get("model", "")
         model_idx = self.model_combo.findText(model)
         if model_idx >= 0:
             self.model_combo.setCurrentIndex(model_idx)
         else:
             self.model_combo.setEditText(model)
-        
-        self.version_edit.setText(cfg.get('api_version', ''))
-        self.reasoning_checkbox.setChecked(cfg.get('is_reasoning_model', False))
-        self.vision_checkbox.setChecked(cfg.get('is_vision_model', False))
-        self.temp_spin.setValue(cfg.get('temperature', 0.7))
-        self.max_tokens_spin.setValue(cfg.get('max_tokens', 4096))
-        self.timeout_spin.setValue(cfg.get('timeout', 60))
-        
+
+        self.version_edit.setText(cfg.get("api_version", ""))
+        self.reasoning_checkbox.setChecked(cfg.get("is_reasoning_model", False))
+        self.vision_checkbox.setChecked(cfg.get("is_vision_model", False))
+        self.temp_spin.setValue(cfg.get("temperature", 0.7))
+        self.max_tokens_spin.setValue(cfg.get("max_tokens", 200000))
+        self.timeout_spin.setValue(cfg.get("timeout", 60))
+
         current = config.config_manager.get_current_config()
         self.current_checkbox.setChecked(
-            current and current.get('name') == cfg.get('name')
+            current and current.get("name") == cfg.get("name")
         )
-    
+
     def clear_form(self):
         self.current_config_name = None
         self.name_edit.clear()
         self.provider_combo.setCurrentIndex(0)
         self.url_edit.clear()
         self.key_edit.clear()
-        self.model_combo.setEditText('')
+        self.model_combo.setEditText("")
         self.version_edit.clear()
         self.reasoning_checkbox.setChecked(False)
         self.vision_checkbox.setChecked(False)
         self.current_checkbox.setChecked(False)
         self.temp_spin.setValue(0.7)
-        self.max_tokens_spin.setValue(4096)
+        self.max_tokens_spin.setValue(200000)
         self.timeout_spin.setValue(60)
-    
+
     def on_new(self):
         self.clear_form()
         self.config_list.clearSelection()
-    
+
     def on_save(self):
         name = self.name_edit.text().strip()
         provider_id = self.provider_combo.currentData()
         url = self.url_edit.text().strip()
         key = self.key_edit.text().strip()
         model = self.model_combo.currentText().strip()
-        
+
         if not name:
-            self.show_warning(i18n._('name_required'))
+            self.show_warning(i18n._("name_required"))
             return
         if not model:
-            self.show_warning(i18n._('model_required'))
+            self.show_warning(i18n._("model_required"))
             return
-        
+
         provider_info = config.get_provider_info(provider_id)
-        if provider_info.get('requires_api_key', True) and not key:
-            self.show_warning(i18n._('key_required'))
+        if provider_info.get("requires_api_key", True) and not key:
+            self.show_warning(i18n._("key_required"))
             return
-        
+
         cfg = {
-            'name': name,
-            'provider': provider_id,
-            'api_url': url,
-            'api_key': key,
-            'model': model,
-            'api_version': self.version_edit.text().strip(),
-            'is_reasoning_model': self.reasoning_checkbox.isChecked(),
-            'is_vision_model': self.vision_checkbox.isChecked(),
-            'temperature': self.temp_spin.value(),
-            'max_tokens': self.max_tokens_spin.value(),
-            'timeout': self.timeout_spin.value(),
+            "name": name,
+            "provider": provider_id,
+            "api_url": url,
+            "api_key": key,
+            "model": model,
+            "api_version": self.version_edit.text().strip(),
+            "is_reasoning_model": self.reasoning_checkbox.isChecked(),
+            "is_vision_model": self.vision_checkbox.isChecked(),
+            "temperature": self.temp_spin.value(),
+            "max_tokens": self.max_tokens_spin.value(),
+            "timeout": self.timeout_spin.value(),
         }
-        
+
         if config.config_manager.add_config(cfg):
-            self.show_info(i18n._('save_success'))
+            self.show_info(i18n._("save_success"))
             if self.current_checkbox.isChecked():
                 config.config_manager.set_current_config(name)
                 ai_client.ai_client.set_config(cfg)
@@ -1229,54 +1258,53 @@ class ConfigWidget(QtWidgets.QWidget):
             self.config_changed.emit()
         else:
             self.show_error("Failed to save configuration")
-    
+
     def on_delete(self):
         name = self.name_edit.text().strip()
         if not name:
-            self.show_warning(i18n._('select_config_first'))
+            self.show_warning(i18n._("select_config_first"))
             return
-        
+
         reply = QtWidgets.QMessageBox.question(
-            self, "Confirm", i18n._('confirm_delete', name),
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+            self,
+            "Confirm",
+            i18n._("confirm_delete", name),
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
         )
-        
+
         if reply == QtWidgets.QMessageBox.Yes:
             if config.config_manager.delete_config(name):
-                self.show_info(i18n._('delete_success'))
+                self.show_info(i18n._("delete_success"))
                 self.clear_form()
                 self.load_configs()
                 self.config_changed.emit()
-    
+
     def on_test(self):
         provider_id = self.provider_combo.currentData()
         url = self.url_edit.text().strip()
         key = self.key_edit.text().strip()
         model = self.model_combo.currentText().strip()
-        
+
         if not model:
-            self.show_warning(i18n._('error_no_config'))
+            self.show_warning(i18n._("error_no_config"))
             return
-        
+
         provider_info = config.get_provider_info(provider_id)
-        if provider_info.get('requires_api_key', True) and not key:
-            self.show_warning(i18n._('error_no_config'))
+        if provider_info.get("requires_api_key", True) and not key:
+            self.show_warning(i18n._("error_no_config"))
             return
-        
+
         temp_client = ai_client.AIClient()
-        temp_client.set_config({
-            'provider': provider_id,
-            'api_url': url,
-            'api_key': key,
-            'model': model
-        })
-        
+        temp_client.set_config(
+            {"provider": provider_id, "api_url": url, "api_key": key, "model": model}
+        )
+
         success, msg = temp_client.test_connection()
         if success:
-            self.show_info(i18n._('test_success'))
+            self.show_info(i18n._("test_success"))
         else:
-            self.show_error(i18n._('test_failed', msg))
-    
+            self.show_error(i18n._("test_failed", msg))
+
     def on_import(self):
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Import Configuration", "", "JSON Files (*.json)"
@@ -1288,7 +1316,7 @@ class ConfigWidget(QtWidgets.QWidget):
                 self.config_changed.emit()
             else:
                 self.show_error("Failed to import configurations")
-    
+
     def on_export(self):
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, "Export Configuration", "pymol_ai_config.json", "JSON Files (*.json)"
@@ -1298,13 +1326,13 @@ class ConfigWidget(QtWidgets.QWidget):
                 self.show_info("Configurations exported successfully")
             else:
                 self.show_error("Failed to export configurations")
-    
+
     def show_info(self, msg):
         QtWidgets.QMessageBox.information(self, "Success", msg)
-    
+
     def show_warning(self, msg):
         QtWidgets.QMessageBox.warning(self, "Warning", msg)
-    
+
     def show_error(self, msg):
         QtWidgets.QMessageBox.critical(self, "Error", msg)
 
@@ -1320,18 +1348,18 @@ class LogWidget(QtWidgets.QWidget):
 
     def update_language(self):
         """更新界面语言"""
-        if hasattr(self, 'category_label'):
-            self.category_label.setText(i18n._('log_category'))
-        if hasattr(self, 'auto_scroll'):
-            self.auto_scroll.setText(i18n._('auto_scroll'))
-        if hasattr(self, 'clear_btn'):
-            self.clear_btn.setText(i18n._('clear_log'))
+        if hasattr(self, "category_label"):
+            self.category_label.setText(i18n._("log_category"))
+        if hasattr(self, "auto_scroll"):
+            self.auto_scroll.setText(i18n._("auto_scroll"))
+        if hasattr(self, "clear_btn"):
+            self.clear_btn.setText(i18n._("clear_log"))
 
     def setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
-        
+
         # 控制栏
         control_panel = QtWidgets.QFrame()
         control_panel.setStyleSheet("""
@@ -1343,12 +1371,12 @@ class LogWidget(QtWidgets.QWidget):
         """)
         control_layout = QtWidgets.QHBoxLayout(control_panel)
         control_layout.setContentsMargins(15, 10, 15, 10)
-        
+
         # 日志类别过滤
-        category_label = QtWidgets.QLabel(i18n._('log_category'))
+        category_label = QtWidgets.QLabel(i18n._("log_category"))
         category_label.setStyleSheet("color: #CCCCCC; font-size: 13px;")
         control_layout.addWidget(category_label)
-        
+
         self.category_combo = QtWidgets.QComboBox()
         self.category_combo.addItem("All", None)
         self.category_combo.addItem("[USER_INPUT]", logger.USER_INPUT)
@@ -1374,11 +1402,11 @@ class LogWidget(QtWidgets.QWidget):
         """)
         self.category_combo.currentIndexChanged.connect(self.on_filter_changed)
         control_layout.addWidget(self.category_combo)
-        
+
         control_layout.addStretch()
-        
+
         # 自动滚动
-        self.auto_scroll = QtWidgets.QCheckBox(i18n._('auto_scroll'))
+        self.auto_scroll = QtWidgets.QCheckBox(i18n._("auto_scroll"))
         self.auto_scroll.setChecked(True)
         self.auto_scroll.setStyleSheet("""
             QCheckBox {
@@ -1398,15 +1426,15 @@ class LogWidget(QtWidgets.QWidget):
             }
         """)
         control_layout.addWidget(self.auto_scroll)
-        
+
         # 清空按钮
-        self.clear_btn = StyledButton(i18n._('clear_log'))
+        self.clear_btn = StyledButton(i18n._("clear_log"))
         self.clear_btn.setFixedSize(85, 30)
         self.clear_btn.clicked.connect(self.on_clear)
         control_layout.addWidget(self.clear_btn)
-        
+
         layout.addWidget(control_panel)
-        
+
         # 日志显示区域
         log_panel = QtWidgets.QFrame()
         log_panel.setStyleSheet("""
@@ -1418,7 +1446,7 @@ class LogWidget(QtWidgets.QWidget):
         """)
         log_layout = QtWidgets.QVBoxLayout(log_panel)
         log_layout.setContentsMargins(10, 10, 10, 10)
-        
+
         self.log_text = QtWidgets.QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setStyleSheet("""
@@ -1433,38 +1461,38 @@ class LogWidget(QtWidgets.QWidget):
             }
         """)
         log_layout.addWidget(self.log_text)
-        
+
         layout.addWidget(log_panel, stretch=1)
-    
+
     def load_logs(self):
         self.log_text.clear()
         category = self.category_combo.currentData()
         logs = logger.logger.get_logs(category=category, limit=500)
-        
+
         for entry in logs:
             self.append_log_entry(entry)
-    
+
     def append_log_entry(self, entry):
-        timestamp = entry.get('timestamp', '')[:19]
-        category = entry.get('category', 'UNKNOWN')
-        message = entry.get('message', '')
-        data = entry.get('data')
-        
+        timestamp = entry.get("timestamp", "")[:19]
+        category = entry.get("category", "UNKNOWN")
+        message = entry.get("message", "")
+        data = entry.get("data")
+
         # 根据类别设置颜色
         colors = {
-            'USER_INPUT': '#58D68D',    # 绿色
-            'AI_REQUEST': '#5DADE2',    # 蓝色
-            'AI_RESPONSE': '#AF7AC5',   # 紫色
-            'TOOL_CALL': '#F5B041',     # 黄色
-            'ERRORS': '#F07178',        # 红色
+            "USER_INPUT": "#58D68D",  # 绿色
+            "AI_REQUEST": "#5DADE2",  # 蓝色
+            "AI_RESPONSE": "#AF7AC5",  # 紫色
+            "TOOL_CALL": "#F5B041",  # 黄色
+            "ERRORS": "#F07178",  # 红色
         }
-        color = colors.get(category, '#FFFFFF')
-        
+        color = colors.get(category, "#FFFFFF")
+
         # 构建日志行
         log_line = '<span style="color: #888888">[%s]</span> ' % timestamp
         log_line += '<span style="color: %s">[%s]</span> ' % (color, category)
-        log_line += '%s' % message.replace("<", "&lt;").replace(">", "&gt;")
-        
+        log_line += "%s" % message.replace("<", "&lt;").replace(">", "&gt;")
+
         # 如果有数据，格式化显示
         if data:
             try:
@@ -1473,34 +1501,37 @@ class LogWidget(QtWidgets.QWidget):
                 else:
                     data_str = str(data)
                 data_str = data_str.replace("<", "&lt;").replace(">", "&gt;")
-                log_line += '<br><span style="color: #888888; margin-left: 20px; font-size: 11px;">%s</span>' % data_str.replace('\n', '<br>')
+                log_line += (
+                    '<br><span style="color: #888888; margin-left: 20px; font-size: 11px;">%s</span>'
+                    % data_str.replace("\n", "<br>")
+                )
             except:
                 pass
-        
-        log_line += '<br>'
-        
+
+        log_line += "<br>"
+
         self.log_text.insertHtml(log_line)
-        
+
         if self.auto_scroll.isChecked():
             scrollbar = self.log_text.verticalScrollBar()
             scrollbar.setValue(scrollbar.maximum())
-    
+
     def on_log_entry(self, entry):
         QtCore.QTimer.singleShot(0, lambda: self.handle_new_entry(entry))
-    
+
     def handle_new_entry(self, entry):
         category_filter = self.category_combo.currentData()
-        if category_filter and entry.get('category') != category_filter:
+        if category_filter and entry.get("category") != category_filter:
             return
         self.append_log_entry(entry)
-    
+
     def on_filter_changed(self):
         self.load_logs()
-    
+
     def on_clear(self):
         logger.logger.clear()
         self.log_text.clear()
-    
+
     def __del__(self):
         try:
             logger.logger.remove_observer(self.on_log_entry)
@@ -1510,13 +1541,13 @@ class LogWidget(QtWidgets.QWidget):
 
 class AboutDialog(QtWidgets.QDialog):
     """关于对话框"""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(i18n._('about_title'))
+        self.setWindowTitle(i18n._("about_title"))
         self.setFixedSize(400, 500)
         self.setup_ui()
-    
+
     def setup_ui(self):
         # 深色主题样式
         self.setStyleSheet("""
@@ -1539,49 +1570,51 @@ class AboutDialog(QtWidgets.QDialog):
                 background-color: #76C5F0;
             }
         """)
-        
+
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(15)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignHCenter)
-        
+
         # 标题
         title_label = QtWidgets.QLabel("🤖 PyMOL AI Assistant")
         title_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #5DADE2;")
         title_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(title_label)
-        
+
         # 版本号
-        version_label = QtWidgets.QLabel("%s %s" % (i18n._('about_version'), __version__))
+        version_label = QtWidgets.QLabel(
+            "%s %s" % (i18n._("about_version"), __version__)
+        )
         version_label.setStyleSheet("font-size: 14px; color: #888888;")
         version_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(version_label)
-        
+
         layout.addSpacing(20)
-        
+
         # 插件介绍
-        intro_text = QtWidgets.QLabel(i18n._('about_intro'))
+        intro_text = QtWidgets.QLabel(i18n._("about_intro"))
         intro_text.setStyleSheet("font-size: 12px; color: #CCCCCC; line-height: 1.6;")
         intro_text.setAlignment(QtCore.Qt.AlignLeft)
         intro_text.setWordWrap(True)
         layout.addWidget(intro_text)
-        
+
         layout.addSpacing(20)
-        
+
         # 作者信息
         info_widget = QtWidgets.QWidget()
         info_layout = QtWidgets.QFormLayout(info_widget)
         info_layout.setSpacing(8)
         info_layout.setLabelAlignment(QtCore.Qt.AlignRight)
-        
+
         author_label = QtWidgets.QLabel("Mo Qiqin")
         author_label.setStyleSheet("color: #CCCCCC;")
-        info_layout.addRow(i18n._('about_author') + ":", author_label)
-        
+        info_layout.addRow(i18n._("about_author") + ":", author_label)
+
         email_label = QtWidgets.QLabel("moqiqin@live.com")
         email_label.setStyleSheet("color: #5DADE2;")
-        info_layout.addRow(i18n._('about_email') + ":", email_label)
-        
+        info_layout.addRow(i18n._("about_email") + ":", email_label)
+
         # GitHub 链接
         github_link = QtWidgets.QLabel(
             "<a href='https://github.com/Masterchiefm/pymol-ai-assistant' "
@@ -1589,13 +1622,13 @@ class AboutDialog(QtWidgets.QDialog):
         )
         github_link.setOpenExternalLinks(True)
         github_link.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
-        info_layout.addRow(i18n._('about_github') + ":", github_link)
-        
+        info_layout.addRow(i18n._("about_github") + ":", github_link)
+
         layout.addWidget(info_widget)
         layout.addStretch()
-        
+
         # 捐赠按钮
-        donate_btn = QtWidgets.QPushButton(i18n._('about_donate'))
+        donate_btn = QtWidgets.QPushButton(i18n._("about_donate"))
         donate_btn.setStyleSheet("""
             QPushButton {
                 background-color: #D4A574;
@@ -1612,18 +1645,18 @@ class AboutDialog(QtWidgets.QDialog):
         """)
         donate_btn.clicked.connect(self.show_donate)
         layout.addWidget(donate_btn, alignment=QtCore.Qt.AlignCenter)
-        
+
         layout.addSpacing(10)
-        
+
         # 关闭按钮
-        close_btn = QtWidgets.QPushButton(i18n._('about_close'))
+        close_btn = QtWidgets.QPushButton(i18n._("about_close"))
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn, alignment=QtCore.Qt.AlignCenter)
-    
+
     def show_donate(self):
         """显示捐赠二维码"""
         donate_dialog = QtWidgets.QDialog(self)
-        donate_dialog.setWindowTitle(i18n._('donate_title'))
+        donate_dialog.setWindowTitle(i18n._("donate_title"))
         donate_dialog.setFixedSize(350, 400)
         donate_dialog.setStyleSheet("""
             QDialog {
@@ -1649,35 +1682,37 @@ class AboutDialog(QtWidgets.QDialog):
         layout.setAlignment(QtCore.Qt.AlignCenter)
 
         # 提示文字
-        hint_label = QtWidgets.QLabel(i18n._('donate_hint'))
+        hint_label = QtWidgets.QLabel(i18n._("donate_hint"))
         hint_label.setWordWrap(True)
         hint_label.setStyleSheet("color: #CCCCCC; font-size: 12px;")
         hint_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(hint_label)
-        
+
         layout.addSpacing(10)
-        
+
         # 加载二维码图片
         qr_path = os.path.join(os.path.dirname(__file__), "fig", "donate.png")
-        
+
         qr_label = QtWidgets.QLabel()
         if os.path.exists(qr_path):
             pixmap = QtGui.QPixmap(qr_path)
-            scaled_pixmap = pixmap.scaled(280, 280, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+            scaled_pixmap = pixmap.scaled(
+                280, 280, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation
+            )
             qr_label.setPixmap(scaled_pixmap)
         else:
-            qr_label.setText(i18n._('donate_qr_missing'))
+            qr_label.setText(i18n._("donate_qr_missing"))
             qr_label.setStyleSheet("color: #E74C3C; font-size: 12px;")
         qr_label.setAlignment(QtCore.Qt.AlignCenter)
         layout.addWidget(qr_label)
-        
+
         layout.addSpacing(10)
-        
+
         # 关闭按钮
-        close_btn = QtWidgets.QPushButton(i18n._('about_close'))
+        close_btn = QtWidgets.QPushButton(i18n._("about_close"))
         close_btn.clicked.connect(donate_dialog.accept)
         layout.addWidget(close_btn, alignment=QtCore.Qt.AlignCenter)
-        
+
         donate_dialog.exec_()
 
 
@@ -1686,11 +1721,16 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(i18n._('window_title'))
+        self.setWindowTitle(i18n._("window_title"))
         # 默认大小500x360（比之前小10%），不设置最小大小限制
         self.resize(500, 360)
         # 启用最大化、最小化和关闭按钮
-        self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowMaximizeButtonHint | QtCore.Qt.WindowMinimizeButtonHint)
+        self.setWindowFlags(
+            QtCore.Qt.Window
+            | QtCore.Qt.WindowCloseButtonHint
+            | QtCore.Qt.WindowMaximizeButtonHint
+            | QtCore.Qt.WindowMinimizeButtonHint
+        )
 
         # 设置深色背景和全局样式
         self.setStyleSheet("""
@@ -1725,16 +1765,16 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
         self.setup_ui()
         self.init_ai_client()
-    
+
     def setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
-        
+
         # 创建菜单栏
         self.setup_menu_bar()
         layout.addLayout(self._menu_layout)
-        
+
         # 创建QTabWidget
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.setDocumentMode(False)
@@ -1776,24 +1816,24 @@ class AIAssistantDialog(QtWidgets.QDialog):
                 color: #CCCCCC;
             }
         """)
-        
+
         # 聊天标签页
         self.chat_widget = ChatWidget()
         self.chat_widget.message_sent.connect(self.on_message_sent)
         self.chat_widget.stop_requested.connect(self.on_stop_requested)
-        self.tabs.addTab(self.chat_widget, i18n._('tab_chat'))
-        
+        self.tabs.addTab(self.chat_widget, i18n._("tab_chat"))
+
         # 配置标签页
         self.config_widget = ConfigWidget()
         self.config_widget.config_changed.connect(self.on_config_changed)
-        self.tabs.addTab(self.config_widget, i18n._('tab_config'))
-        
+        self.tabs.addTab(self.config_widget, i18n._("tab_config"))
+
         # 日志标签页
         self.log_widget = LogWidget()
-        self.tabs.addTab(self.log_widget, i18n._('tab_log'))
-        
+        self.tabs.addTab(self.log_widget, i18n._("tab_log"))
+
         layout.addWidget(self.tabs)
-    
+
     def setup_menu_bar(self):
         """设置菜单栏"""
         # 创建水平布局放置菜单按钮
@@ -1811,14 +1851,17 @@ class AIAssistantDialog(QtWidgets.QDialog):
         # 更新提示按钮（如果有更新）
         self.update_btn = None
         update_info = get_update_info()
-        if update_info.get('has_update'):
-            self.update_btn = StyledButton("⬆️ " + ("Update" if i18n.get_language() == 'en' else "更新"), accent=True)
+        if update_info.get("has_update"):
+            self.update_btn = StyledButton(
+                "⬆️ " + ("Update" if i18n.get_language() == "en" else "更新"),
+                accent=True,
+            )
             self.update_btn.setFixedHeight(32)
             self.update_btn.clicked.connect(self.show_update_dialog)
             menu_layout.addWidget(self.update_btn)
 
         # 关于按钮
-        self.about_btn = StyledButton("ℹ️ " + i18n._('menu_about'))
+        self.about_btn = StyledButton("ℹ️ " + i18n._("menu_about"))
         self.about_btn.setFixedHeight(32)
         self.about_btn.clicked.connect(self.show_about_dialog)
         menu_layout.addWidget(self.about_btn)
@@ -1831,10 +1874,15 @@ class AIAssistantDialog(QtWidgets.QDialog):
     def show_update_dialog(self):
         """显示更新对话框"""
         from . import get_update_info
+
         update_info = get_update_info()
 
         dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle(i18n._('update_title') if hasattr(i18n, '_') and i18n._('update_title') != 'update_title' else ("Update Available" if i18n.get_language() == 'en' else "发现新版本"))
+        dialog.setWindowTitle(
+            i18n._("update_title")
+            if hasattr(i18n, "_") and i18n._("update_title") != "update_title"
+            else ("Update Available" if i18n.get_language() == "en" else "发现新版本")
+        )
         dialog.setFixedSize(500, 450)
 
         # 深色主题样式
@@ -1878,7 +1926,7 @@ class AIAssistantDialog(QtWidgets.QDialog):
         layout.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignHCenter)
 
         # 标题
-        is_en = i18n.get_language() == 'en'
+        is_en = i18n.get_language() == "en"
         title_text = "⬆️ New Version Available" if is_en else "⬆️ 发现新版本"
         title_label = QtWidgets.QLabel(title_text)
         title_label.setStyleSheet("font-size: 22px; font-weight: bold; color: #5DADE2;")
@@ -1886,9 +1934,13 @@ class AIAssistantDialog(QtWidgets.QDialog):
         layout.addWidget(title_label)
 
         # 版本信息
-        current_ver = update_info.get('current_version', 'Unknown')
-        latest_ver = update_info.get('latest_version', 'Unknown')
-        version_text = f"v{current_ver} → v{latest_ver}" if is_en else f"当前: v{current_ver} → 新版: v{latest_ver}"
+        current_ver = update_info.get("current_version", "Unknown")
+        latest_ver = update_info.get("latest_version", "Unknown")
+        version_text = (
+            f"v{current_ver} → v{latest_ver}"
+            if is_en
+            else f"当前: v{current_ver} → 新版: v{latest_ver}"
+        )
         version_label = QtWidgets.QLabel(version_text)
         version_label.setStyleSheet("font-size: 14px; color: #888888;")
         version_label.setAlignment(QtCore.Qt.AlignCenter)
@@ -1897,12 +1949,16 @@ class AIAssistantDialog(QtWidgets.QDialog):
         layout.addSpacing(10)
 
         # 更新内容
-        release_info = update_info.get('release_info', '')
+        release_info = update_info.get("release_info", "")
         if release_info:
-            release_label = QtWidgets.QLabel(("Release Notes:" if is_en else "更新内容：") + "\n")
-            release_label.setStyleSheet("font-size: 13px; color: #CCCCCC; font-weight: bold;")
+            release_label = QtWidgets.QLabel(
+                ("Release Notes:" if is_en else "更新内容：") + "\n"
+            )
+            release_label.setStyleSheet(
+                "font-size: 13px; color: #CCCCCC; font-weight: bold;"
+            )
             layout.addWidget(release_label)
-            
+
             release_text = QtWidgets.QTextEdit()
             release_text.setPlainText(release_info)
             release_text.setReadOnly(True)
@@ -1984,258 +2040,281 @@ class AIAssistantDialog(QtWidgets.QDialog):
         """安装更新"""
         from PyQt5.QtWidgets import QMessageBox, QProgressDialog
         from PyQt5.QtCore import Qt
-        
-        is_en = i18n.get_language() == 'en'
-        
+
+        is_en = i18n.get_language() == "en"
+
         # 创建进度对话框
         progress = QProgressDialog(dialog)
         progress.setWindowTitle("Installing Update" if is_en else "安装更新")
-        progress.setLabelText("Downloading from Gitee..." if is_en else "从Gitee下载中...")
+        progress.setLabelText(
+            "Downloading from Gitee..." if is_en else "从Gitee下载中..."
+        )
         progress.setRange(0, 100)
         progress.setWindowModality(Qt.WindowModal)
         progress.show()
-        
+
         # 创建下载线程
         download_thread = updater.DownloadThread(is_en)
-        
+
         # 连接信号
         download_thread.progress.connect(progress.setValue)
         download_thread.status.connect(progress.setLabelText)
-        download_thread.finished.connect(lambda success, error, temp_file: self.on_download_finished(dialog, progress, success, error, temp_file, is_en))
-        
+        download_thread.finished.connect(
+            lambda success, error, temp_file: self.on_download_finished(
+                dialog, progress, success, error, temp_file, is_en
+            )
+        )
+
         # 启动线程
         download_thread.start()
-        
+
         # 保存线程引用
         self._download_thread = download_thread
-    
+
     def on_download_finished(self, dialog, progress, success, error, temp_file, is_en):
         """下载完成处理 - 在主线程中执行安装"""
         from PyQt5.QtWidgets import QMessageBox
-        
+
         if success and temp_file:
             # 下载成功，开始安装
             progress.setLabelText("Installing plugin..." if is_en else "安装插件中...")
             progress.setValue(90)
-            
+
             try:
                 # 在主线程中安装插件
-                sys.path.insert(0, r'C:\Users\moqiq\PycharmProjects\pymol-open-source-master\modules')
+                sys.path.insert(
+                    0,
+                    r"C:\Users\moqiq\PycharmProjects\pymol-open-source-master\modules",
+                )
                 from pymol.plugins.installation import installPluginFromFile
-                
+
                 installPluginFromFile(temp_file)
-                
+
                 progress.setValue(100)
                 progress.close()
-                
+
                 QMessageBox.information(
                     dialog,
                     "Success" if is_en else "安装成功",
-                    "Update installed successfully!\n\nPlease restart PyMOL to use the new version." if is_en else "更新安装成功！\n\n请重启PyMOL以使用新版本。"
+                    "Update installed successfully!\n\nPlease restart PyMOL to use the new version."
+                    if is_en
+                    else "更新安装成功！\n\n请重启PyMOL以使用新版本。",
                 )
                 dialog.accept()
-                
+
             except Exception as e:
                 progress.close()
                 QMessageBox.critical(
                     dialog,
                     "Error" if is_en else "错误",
-                    f"Failed to install plugin: {str(e)}" if is_en else 
-                    f"安装插件失败: {str(e)}"
+                    f"Failed to install plugin: {str(e)}"
+                    if is_en
+                    else f"安装插件失败: {str(e)}",
                 )
-        
+
         else:
             progress.close()
-            
+
             if error == "Download failed":
                 # 都超时了，提示用户手动下载
                 msg_box = QMessageBox(dialog)
                 msg_box.setWindowTitle("Download Failed" if is_en else "下载失败")
                 msg_box.setText(
-                    "Download timeout. Please download manually from the release page:" if is_en else 
-                    "下载超时。请从以下发布页面手动下载："
+                    "Download timeout. Please download manually from the release page:"
+                    if is_en
+                    else "下载超时。请从以下发布页面手动下载："
                 )
                 msg_box.setIcon(QMessageBox.Warning)
-                
+
                 # 添加跳转按钮
                 gitee_btn = msg_box.addButton("Gitee", QMessageBox.ActionRole)
                 github_btn = msg_box.addButton("GitHub", QMessageBox.ActionRole)
                 msg_box.addButton(QMessageBox.Ok)
-                
+
                 msg_box.exec_()
-                
+
                 # 处理按钮点击
                 clicked_btn = msg_box.clickedButton()
                 if clicked_btn == gitee_btn:
                     import webbrowser
-                    webbrowser.open("https://gitee.com/MasterChiefm/pymol-ai-assistant/releases")
+
+                    webbrowser.open(
+                        "https://gitee.com/MasterChiefm/pymol-ai-assistant/releases"
+                    )
                 elif clicked_btn == github_btn:
                     import webbrowser
-                    webbrowser.open("https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest")
+
+                    webbrowser.open(
+                        "https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest"
+                    )
             else:
                 # 其他错误
                 QMessageBox.critical(
                     dialog,
                     "Error" if is_en else "错误",
-                    f"Failed to download update: {error}" if is_en else 
-                    f"下载更新失败: {error}"
+                    f"Failed to download update: {error}"
+                    if is_en
+                    else f"下载更新失败: {error}",
                 )
 
     def open_update_page_and_close(self, dialog):
         """打开更新页面并关闭对话框"""
         import webbrowser
+
         # 根据语言选择对应的更新页面
-        if i18n.get_language() == 'zh':
+        if i18n.get_language() == "zh":
             url = "https://gitee.com/MasterChiefm/pymol-ai-assistant/releases"
         else:
             url = "https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest"
         webbrowser.open(url)
         dialog.accept()
-    
+
     def _get_target_language_text(self):
         """获取目标语言文本（显示当前语言对应的目标语言）"""
-        if i18n.get_language() == 'zh':
-            return 'English'
+        if i18n.get_language() == "zh":
+            return "English"
         else:
-            return '中文'
+            return "中文"
 
     def toggle_language(self):
         """点击切换语言"""
         current_lang = i18n.get_language()
-        new_lang = 'en' if current_lang == 'zh' else 'zh'
+        new_lang = "en" if current_lang == "zh" else "zh"
         i18n.set_language(new_lang)
         config.config_manager.set_language(new_lang)
 
     def _on_language_changed(self, lang):
         """语言变更回调 - 更新所有UI文本"""
         # 更新窗口标题
-        self.setWindowTitle(i18n._('window_title'))
+        self.setWindowTitle(i18n._("window_title"))
 
         # 更新语言按钮 - 显示目标语言
         self.lang_btn.setText("🌐 " + self._get_target_language_text())
-        self.about_btn.setText("ℹ️ " + i18n._('menu_about'))
+        self.about_btn.setText("ℹ️ " + i18n._("menu_about"))
 
         # 更新更新按钮文本
         if self.update_btn:
-            self.update_btn.setText("⬆️ " + ("Update" if lang == 'en' else "更新"))
+            self.update_btn.setText("⬆️ " + ("Update" if lang == "en" else "更新"))
 
         # 更新标签页标题
-        self.tabs.setTabText(0, i18n._('tab_chat'))
-        self.tabs.setTabText(1, i18n._('tab_config'))
-        self.tabs.setTabText(2, i18n._('tab_log'))
+        self.tabs.setTabText(0, i18n._("tab_chat"))
+        self.tabs.setTabText(1, i18n._("tab_config"))
+        self.tabs.setTabText(2, i18n._("tab_log"))
 
         # 更新聊天组件
-        self.chat_widget.input_text.setPlaceholderText(i18n._('input_placeholder'))
-        self.chat_widget.send_btn.setText(i18n._('send_button') if not self.chat_widget.is_streaming else i18n._('stop_button'))
-        self.chat_widget.clear_btn.setText(i18n._('clear_chat'))
+        self.chat_widget.input_text.setPlaceholderText(i18n._("input_placeholder"))
+        self.chat_widget.send_btn.setText(
+            i18n._("send_button")
+            if not self.chat_widget.is_streaming
+            else i18n._("stop_button")
+        )
+        self.chat_widget.clear_btn.setText(i18n._("clear_chat"))
         # 更新消息角色标签
         for msg in self.chat_widget.messages:
-            role = msg['role']
-            widget = msg['widget']
+            role = msg["role"]
+            widget = msg["widget"]
             role_text = {
-                'user': i18n._('user'),
-                'assistant': i18n._('assistant'),
-                'thinking': i18n._('thinking'),
-                'tool': i18n._('using_tool'),
-                'tool_result': i18n._('tool_result'),
-                'tool_error': i18n._('tool_error'),
+                "user": i18n._("user"),
+                "assistant": i18n._("assistant"),
+                "thinking": i18n._("thinking"),
+                "tool": i18n._("using_tool"),
+                "tool_result": i18n._("tool_result"),
+                "tool_error": i18n._("tool_error"),
             }.get(role, role)
             widget.role_label.setText("<b>%s:</b>" % role_text)
 
         # 更新配置和日志界面
         self.config_widget.update_language()
         self.log_widget.update_language()
-    
+
     def show_about_dialog(self):
         """显示关于对话框"""
         dialog = AboutDialog(self)
         dialog.exec_()
-    
+
     def init_ai_client(self):
         cfg = config.config_manager.get_current_config()
         if cfg:
             ai_client.ai_client.set_config(cfg)
             logger.logger.info(logger.SYSTEM, "AI client initialized", cfg)
-            
+
             # 初始化视觉模式状态
-            is_vision = cfg.get('is_vision_model', False)
+            is_vision = cfg.get("is_vision_model", False)
             self.chat_widget.update_vision_mode(is_vision)
-    
+
     def on_message_sent(self, text, images=None):
         cfg = config.config_manager.get_current_config()
         if not cfg:
-            QtWidgets.QMessageBox.warning(self, i18n._('error_no_config'), i18n._('error_no_config'))
-            return
-        
-        # 如果有图片但配置不是视觉模型，给出提示
-        if images and not cfg.get('is_vision_model', False):
             QtWidgets.QMessageBox.warning(
-                self, 
-                i18n._('error_no_config'), 
-                "当前配置未启用视觉模型功能，请在配置页勾选'视觉模型'选项"
+                self, i18n._("error_no_config"), i18n._("error_no_config")
             )
             return
-        
+
+        # 如果有图片但配置不是视觉模型，给出提示
+        if images and not cfg.get("is_vision_model", False):
+            QtWidgets.QMessageBox.warning(
+                self,
+                i18n._("error_no_config"),
+                "当前配置未启用视觉模型功能，请在配置页勾选'视觉模型'选项",
+            )
+            return
+
         ai_client.ai_client.set_config(cfg)
-        
+
         # 记录用户输入（详细日志）
         logger.logger.info(
-            logger.USER_INPUT, 
-            "用户发送消息", 
-            {"content": text, "has_images": bool(images)}
+            logger.USER_INPUT,
+            "用户发送消息",
+            {"content": text, "has_images": bool(images)},
         )
-        
+
         # 获取历史消息（用于上下文）
         history_messages = self.chat_widget.get_messages_for_api()
-        
+
         # 如果有图片，需要为最后一条用户消息添加图片信息
         if images:
             # 找到最后一条用户消息（就是刚刚添加的那条）
             last_user_msg = None
             last_user_msg_index = -1
             for i, msg in enumerate(history_messages):
-                if msg['role'] == 'user':
+                if msg["role"] == "user":
                     last_user_msg_index = i
                     last_user_msg = msg
-            
-            if last_user_msg and last_user_msg['content'] == text:
+
+            if last_user_msg and last_user_msg["content"] == text:
                 # 构建视觉模型的消息格式
                 content_list = []
-                
+
                 if text:
-                    content_list.append({
-                        "type": "text",
-                        "text": text
-                    })
-                
+                    content_list.append({"type": "text", "text": text})
+
                 import base64
+
                 for img_data in images:
-                    img_bytes = img_data.get('data')
+                    img_bytes = img_data.get("data")
                     if img_bytes:
-                        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
-                        content_list.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{img_base64}"
+                        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+                        content_list.append(
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{img_base64}"
+                                },
                             }
-                        })
-                
+                        )
+
                 if content_list:
-                    history_messages[last_user_msg_index]['content'] = content_list
-        
+                    history_messages[last_user_msg_index]["content"] = content_list
+
         # 记录发送到AI服务器的请求
         request_data = {
-            "model": cfg.get('model'),
+            "model": cfg.get("model"),
             "messages": history_messages,
             "stream": False,
-            "tools": "enabled"
+            "tools": "enabled",
         }
-        logger.logger.info(
-            logger.AI_REQUEST,
-            "发送到AI服务器的请求",
-            request_data
-        )
-        
+        logger.logger.info(logger.AI_REQUEST, "发送到AI服务器的请求", request_data)
+
         # 不再传递 images 给 worker，因为已经合并到 messages 中了
         self.worker = AIStreamWorker(history_messages, None)
         self.worker.thinking_signal.connect(self.on_thinking)
@@ -2244,149 +2323,164 @@ class AIAssistantDialog(QtWidgets.QDialog):
         self.worker.error_signal.connect(self.on_error)
         self.worker.finished_signal.connect(self.on_request_finished)
         self.worker.start()
-        
+
         # 显示加载指示器
         self.chat_widget.show_loading()
-    
+
     def on_stop_requested(self):
         """用户请求停止"""
-        if hasattr(self, 'worker') and self.worker.isRunning():
+        if hasattr(self, "worker") and self.worker.isRunning():
             self.worker.terminate()
             self.chat_widget.hide_loading()
             self.chat_widget.set_streaming_state(False)
-            self.chat_widget.add_message('assistant', '[已停止]')
-    
+            self.chat_widget.add_message("assistant", "[已停止]")
+
     def on_thinking(self, text, is_end):
         # 显示 reasoning content
         if text:
             if not self.chat_widget.is_thinking:
                 self.chat_widget.is_thinking = True
-                self.chat_widget.start_message('thinking')
+                self.chat_widget.start_message("thinking")
             self.chat_widget.append_to_current(text)
         if is_end:
             self.chat_widget.is_thinking = False
-    
+
     def on_content(self, text, is_end):
         if text:
             if self.chat_widget.is_thinking:
                 self.chat_widget.is_thinking = False
-                self.chat_widget.start_message('assistant')
-            elif not self.chat_widget.current_message_widget or self.chat_widget.current_message_widget.role != 'assistant':
-                self.chat_widget.start_message('assistant')
+                self.chat_widget.start_message("assistant")
+            elif (
+                not self.chat_widget.current_message_widget
+                or self.chat_widget.current_message_widget.role != "assistant"
+            ):
+                self.chat_widget.start_message("assistant")
             self.chat_widget.append_to_current(text)
-    
+
     def on_tool_call(self, tool_name, params, result):
         # 只处理有结果的情况，避免重复显示
         if result is not None:
             # 如果是截图工具且返回了图片，显示图片
-            if tool_name == 'pymol_capture_view' and result.get('success') and result.get('image_data'):
+            if (
+                tool_name == "pymol_capture_view"
+                and result.get("success")
+                and result.get("image_data")
+            ):
                 import base64
                 from pymol.Qt import QtGui
-                
-                image_data = result.get('image_data')
+
+                image_data = result.get("image_data")
                 img_bytes = base64.b64decode(image_data)
                 pixmap = QtGui.QPixmap()
                 pixmap.loadFromData(img_bytes)
-                
+
                 if not pixmap.isNull():
                     # 显示工具调用和截图
-                    self.chat_widget.add_message('tool', "使用工具: %s\n参数: %s\n结果: %s" % (tool_name, params, result.get('message')), images=[{'pixmap': pixmap, 'preview': pixmap}])
+                    self.chat_widget.add_message(
+                        "tool",
+                        "使用工具: %s\n参数: %s\n结果: %s"
+                        % (tool_name, params, result.get("message")),
+                        images=[{"pixmap": pixmap, "preview": pixmap}],
+                    )
                 else:
-                    self.chat_widget.add_message('tool', "使用工具: %s\n参数: %s\n结果: %s" % (tool_name, params, result))
+                    self.chat_widget.add_message(
+                        "tool",
+                        "使用工具: %s\n参数: %s\n结果: %s"
+                        % (tool_name, params, result),
+                    )
             else:
-                self.chat_widget.add_message('tool', "使用工具: %s\n参数: %s\n结果: %s" % (tool_name, params, result))
-    
+                self.chat_widget.add_message(
+                    "tool",
+                    "使用工具: %s\n参数: %s\n结果: %s" % (tool_name, params, result),
+                )
+
     def on_error(self, error_msg):
         # 记录错误到日志
-        logger.logger.error(
-            logger.ERRORS,
-            "AI请求错误",
-            {"error": error_msg}
-        )
-        self.chat_widget.add_message('assistant', "错误: %s" % error_msg)
+        logger.logger.error(logger.ERRORS, "AI请求错误", {"error": error_msg})
+        self.chat_widget.add_message("assistant", "错误: %s" % error_msg)
         self.chat_widget.hide_loading()
         self.chat_widget.set_streaming_state(False)
-    
+
     def on_request_finished(self):
         self.chat_widget.hide_loading()
         self.chat_widget.set_streaming_state(False)
-    
+
     def on_config_changed(self):
         self.init_ai_client()
-        
+
         # 更新聊天界面的视觉模式
         cfg = config.config_manager.get_current_config()
         if cfg:
-            is_vision = cfg.get('is_vision_model', False)
+            is_vision = cfg.get("is_vision_model", False)
             self.chat_widget.update_vision_mode(is_vision)
 
 
 class AIStreamWorker(QtCore.QThread):
     """AI请求工作线程 - 非流式调用"""
-    
+
     thinking_signal = QtCore.Signal(str, bool)
     content_signal = QtCore.Signal(str, bool)
     tool_signal = QtCore.Signal(str, object, object)
     error_signal = QtCore.Signal(str)
     finished_signal = QtCore.Signal()
-    
+
     def __init__(self, messages, images=None):
         super().__init__()
         self.messages = messages
         self.images = images or []
         self._is_running = True
-    
+
     def run(self):
         try:
             accumulated_content = ""
             accumulated_thinking = ""
-            
+
             def on_thinking(text, is_end):
                 if self._is_running:
                     nonlocal accumulated_thinking
                     accumulated_thinking += text
                     self.thinking_signal.emit(text, is_end)
-            
+
             def on_content(text, is_end):
                 if self._is_running:
                     nonlocal accumulated_content
                     accumulated_content += text
                     self.content_signal.emit(text, is_end)
-            
+
             def on_tool_call(tool_name, params, result):
                 if self._is_running:
                     self.tool_signal.emit(tool_name, params, result)
-            
+
             def on_error(error_msg):
                 if self._is_running:
                     self.error_signal.emit(error_msg)
-            
+
             result = ai_client.ai_client.chat(
                 self.messages,
                 on_thinking=on_thinking,
                 on_content=on_content,
                 on_tool_call=on_tool_call,
                 on_error=on_error,
-                images=self.images
+                images=self.images,
             )
-            
+
             logger.logger.info(
                 logger.AI_RESPONSE,
                 "AI服务器的完整响应",
                 {
                     "thinking": accumulated_thinking,
                     "content": accumulated_content,
-                    "final_result": result
-                }
+                    "final_result": result,
+                },
             )
-        
+
         except Exception as e:
             if self._is_running:
                 self.error_signal.emit(str(e))
-        
+
         finally:
             self.finished_signal.emit()
-    
+
     def terminate(self):
         self._is_running = False
         super().terminate()

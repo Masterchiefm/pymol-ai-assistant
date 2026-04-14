@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-'''
+"""
 PyMOL AI Assistant Plugin
 
 Author: Mo Qiqin
@@ -9,14 +9,16 @@ Description:
     An AI-powered assistant plugin for PyMOL that uses tool-calling capabilities
     to control PyMOL through natural language conversations.
     Now powered by LiteLLM for unified access to 100+ LLM providers.
-'''
+"""
 
 from __future__ import print_function
 import sys
 import os
 
+import time as _time
+
 # 版本号
-__version__ = '3.0.4'
+__version__ = "3.0.4"
 
 # 获取插件目录
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -29,59 +31,61 @@ if PLUGIN_DIR not in sys.path:
 def check_and_install_dependencies():
     """检查并安装依赖"""
     import subprocess
-    import importlib
 
-    # 获取当前Python解释器路径
     python_executable = sys.executable
 
-    # 必需的依赖
     required_packages = {
-        'requests': 'requests',
-        'PyQt5': 'PyQt5',
-        'litellm': 'litellm',
-        'json_repair': 'json-repair',
-        'markdown': 'markdown',
+        "requests": "requests",
+        "PyQt5": "PyQt5",
+        "litellm": "litellm",
+        "json_repair": "json-repair",
+        "markdown": "markdown",
     }
 
-    missing_packages = []
-
-    for package_name, install_name in required_packages.items():
-        try:
-            importlib.import_module(package_name)
-        except ImportError:
-            missing_packages.append(install_name)
+    missing_packages = [
+        install_name
+        for package_name, install_name in required_packages.items()
+        if package_name not in sys.modules
+    ]
 
     if missing_packages:
-        print("[PyMOL AI Assistant] 正在安装依赖: {}".format(', '.join(missing_packages)))
+        print(
+            "[PyMOL AI Assistant] 正在安装依赖: {}".format(", ".join(missing_packages))
+        )
         try:
-            subprocess.check_call([
-                python_executable, '-m', 'pip', 'install',
-                '-i', 'http://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple',
-                '--trusted-host', 'mirrors.tuna.tsinghua.edu.cn',
-                '--user', '--quiet'
-            ] + missing_packages)
+            subprocess.check_call(
+                [
+                    python_executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "-i",
+                    "http://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple",
+                    "--trusted-host",
+                    "mirrors.tuna.tsinghua.edu.cn",
+                    "--user",
+                    "--quiet",
+                ]
+                + missing_packages
+            )
             print("[PyMOL AI Assistant] 依赖安装成功！")
-            # 重新加载以检测新安装的包
-            for package_name in required_packages.keys():
-                try:
-                    if package_name in sys.modules:
-                        importlib.reload(sys.modules[package_name])
-                    else:
-                        importlib.import_module(package_name)
-                except:
-                    pass
         except Exception as e:
             print("[PyMOL AI Assistant] 依赖安装失败: {}".format(e))
-            print("[PyMOL AI Assistant] 请手动安装: pip install {}".format(' '.join(missing_packages)))
+            print(
+                "[PyMOL AI Assistant] 请手动安装: pip install {}".format(
+                    " ".join(missing_packages)
+                )
+            )
 
 
 # 全局变量存储更新信息
 _update_info = {
-    'has_update': False,
-    'latest_version': '',
-    'current_version': __version__,
-    'release_info': ''
+    "has_update": False,
+    "latest_version": "",
+    "current_version": __version__,
+    "release_info": "",
 }
+
 
 def check_update():
     """检查更新"""
@@ -92,15 +96,15 @@ def check_update():
         global _update_info
         try:
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
             response = requests.get(
                 "https://gitee.com/api/v5/repos/MasterChiefm/pymol-ai-assistant/releases/latest",
                 timeout=3,
-                headers=headers
+                headers=headers,
             )
             info = response.json()
-            latest_version = info.get("tag_name", "").lstrip('v')
+            latest_version = info.get("tag_name", "").lstrip("v")
             release_info = info.get("body", "")
 
             if not latest_version:
@@ -108,13 +112,21 @@ def check_update():
 
             # 只要版本号不同就提示更新
             if latest_version != __version__:
-                _update_info['has_update'] = True
-                _update_info['latest_version'] = latest_version
-                _update_info['release_info'] = release_info
-                print("[PyMOL AI Assistant] 发现新版本: v{} (当前: v{})".format(latest_version, __version__))
+                _update_info["has_update"] = True
+                _update_info["latest_version"] = latest_version
+                _update_info["release_info"] = release_info
+                print(
+                    "[PyMOL AI Assistant] 发现新版本: v{} (当前: v{})".format(
+                        latest_version, __version__
+                    )
+                )
                 print("[PyMOL AI Assistant] 请卸载旧版后安装新版")
-                print("[PyMOL AI Assistant] 中文用户: https://gitee.com/MasterChiefm/pymol-ai-assistant/releases")
-                print("[PyMOL AI Assistant] English: https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest")
+                print(
+                    "[PyMOL AI Assistant] 中文用户: https://gitee.com/MasterChiefm/pymol-ai-assistant/releases"
+                )
+                print(
+                    "[PyMOL AI Assistant] English: https://github.com/Masterchiefm/pymol-ai-assistant/releases/latest"
+                )
             else:
                 print("[PyMOL AI Assistant] 当前已是最新版本 (v{})".format(__version__))
 
@@ -127,25 +139,27 @@ def check_update():
     thread = threading.Thread(target=_do_check, daemon=True)
     thread.start()
 
+
 def get_update_info():
     """获取更新信息"""
     return _update_info
 
 
-# 在导入其他模块前检查依赖
-check_and_install_dependencies()
+# 在后台检查依赖（不阻塞启动）
+_t0 = _time.time()
+import threading as _threading
 
-# 检查更新
+_dep_thread = _threading.Thread(target=check_and_install_dependencies, daemon=True)
+_dep_thread.start()
+_t1 = _time.time()
+print(
+    "[PyMOL AI Assistant] [耗时] check_and_install_dependencies (后台): {:.3f}s".format(
+        _t1 - _t0
+    )
+)
+
+# 检查更新（后台线程）
 check_update()
-
-# 导入插件主模块
-try:
-    from . import main
-    from .main import AIAssistantDialog
-except ImportError as e:
-    print("[PyMOL AI Assistant] 导入失败: {}".format(e))
-    raise
-
 
 # 全局对话框实例
 _dialog_instance = None
@@ -155,7 +169,68 @@ def show_dialog():
     """显示AI助手对话框"""
     global _dialog_instance
 
+    import time as _time
+
+    _t0 = _time.time()
+
     from pymol.Qt import QtWidgets
+
+    _t1 = _time.time()
+    print("[PyMOL AI Assistant] [耗时] import pymol.Qt: {:.3f}s".format(_t1 - _t0))
+
+    from . import i18n
+
+    _t2 = _time.time()
+    print("[PyMOL AI Assistant] [耗时] import i18n: {:.3f}s".format(_t2 - _t1))
+
+    from . import config
+
+    _t3 = _time.time()
+    print("[PyMOL AI Assistant] [耗时] import config: {:.3f}s".format(_t3 - _t2))
+
+    from . import logger
+
+    _t4 = _time.time()
+    print("[PyMOL AI Assistant] [耗时] import logger: {:.3f}s".format(_t4 - _t3))
+
+    _t_pre_litellm = _time.time()
+    from . import ai_client
+
+    _t5 = _time.time()
+    print(
+        "[PyMOL AI Assistant] [耗时] import ai_client (含 litellm): {:.3f}s".format(
+            _t5 - _t_pre_litellm
+        )
+    )
+
+    from . import tools
+
+    _t6 = _time.time()
+    print(
+        "[PyMOL AI Assistant] [耗时] import tools (含 pymol.cmd): {:.3f}s".format(
+            _t6 - _t5
+        )
+    )
+
+    from . import markdown_renderer
+
+    _t7 = _time.time()
+    print(
+        "[PyMOL AI Assistant] [耗时] import markdown_renderer: {:.3f}s".format(
+            _t7 - _t6
+        )
+    )
+
+    from . import updater
+
+    _t8 = _time.time()
+    print("[PyMOL AI Assistant] [耗时] import updater: {:.3f}s".format(_t8 - _t7))
+
+    from .main import AIAssistantDialog
+
+    _t9 = _time.time()
+    print("[PyMOL AI Assistant] [耗时] import main: {:.3f}s".format(_t9 - _t8))
+    print("[PyMOL AI Assistant] [耗时] 全部导入总计: {:.3f}s".format(_t9 - _t0))
 
     # 获取PyMOL主窗口作为父窗口
     app = QtWidgets.QApplication.instance()
@@ -164,6 +239,7 @@ def show_dialog():
     # 尝试获取PyMOL主窗口
     try:
         from pymol import cmd
+
         parent = cmd.get_qtwindow()
     except:
         pass
@@ -179,15 +255,31 @@ def show_dialog():
             _dialog_instance = None
 
     # 创建新对话框
+    _t_create = _time.time()
     _dialog_instance = AIAssistantDialog(parent)
+    _t_done = _time.time()
+    print("[PyMOL AI Assistant] [耗时] 创建对话框: {:.3f}s".format(_t_done - _t_create))
+    print("[PyMOL AI Assistant] [耗时] show_dialog 总计: {:.3f}s".format(_t_done - _t0))
+
     _dialog_instance.show()
 
 
 def __init_plugin__(app=None):
     """初始化插件 - PyMOL会调用这个函数"""
+    _t0 = _time.time()
     from pymol.plugins import addmenuitemqt
 
-    # 添加菜单项
-    addmenuitemqt('AI Assistant / AI助手', show_dialog)
+    _t1 = _time.time()
+    print(
+        "[PyMOL AI Assistant] [耗时] __init_plugin__ import pymol.plugins: {:.3f}s".format(
+            _t1 - _t0
+        )
+    )
 
-    print("[PyMOL AI Assistant] 插件 v{} 已加载。请通过 Plugin > AI Assistant / AI助手 菜单打开。".format(__version__))
+    addmenuitemqt("AI Assistant / AI助手", show_dialog)
+
+    print(
+        "[PyMOL AI Assistant] 插件 v{} 已加载。请通过 Plugin > AI Assistant / AI助手 菜单打开。".format(
+            __version__
+        )
+    )
