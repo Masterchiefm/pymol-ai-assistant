@@ -168,6 +168,7 @@ class MessageWidget(QtWidgets.QFrame):
         }.get(self.role, self.role)
 
         self.role_label = QtWidgets.QLabel("<b>%s:</b>" % role_text)
+        self._thinking_collapsed = False
 
         if self.role == "user":
             role_color = COLORS["accent_green"]
@@ -373,6 +374,34 @@ class MessageWidget(QtWidgets.QFrame):
     def append_content(self, text):
         """追加内容"""
         self.set_content(self.raw_content + text)
+
+    def collapse_thinking_content(self):
+        """思考结束后折叠思考内容"""
+        if self.role != "thinking":
+            return
+        self._thinking_collapsed = True
+        self.content_label.hide()
+        self.role_label.setText(
+            "<b>▶ %s:</b>" % i18n._("thinking_content")
+        )
+        self.role_label.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.role_label.setStyleSheet(
+            "color: %s; font-size: 14px; background: transparent;" % COLORS["accent_yellow"]
+        )
+        self.role_label.mousePressEvent = self._toggle_thinking
+
+    def _toggle_thinking(self, event=None):
+        self._thinking_collapsed = not self._thinking_collapsed
+        if self._thinking_collapsed:
+            self.content_label.hide()
+            self.role_label.setText(
+                "<b>▶ %s:</b>" % i18n._("thinking_content")
+            )
+        else:
+            self.content_label.show()
+            self.role_label.setText(
+                "<b>▼ %s:</b>" % i18n._("thinking_content")
+            )
 
 
 class ChatWidget(QtWidgets.QWidget):
@@ -911,6 +940,24 @@ class ConfigWidget(QtWidgets.QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
 
+        scroll_area = QtWidgets.QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                background-color: transparent;
+                border: none;
+            }
+            QScrollArea > QWidget > QWidget {
+                background-color: transparent;
+            }
+        """)
+        scroll_content = QtWidgets.QWidget()
+        scroll_content.setStyleSheet("background-color: transparent;")
+        scroll_layout = QtWidgets.QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(15)
+
         panel = QtWidgets.QFrame()
         panel.setStyleSheet("""
             QFrame {
@@ -1217,7 +1264,7 @@ class ConfigWidget(QtWidgets.QWidget):
         io_layout.addStretch()
         panel_layout.addLayout(io_layout)
 
-        main_layout.addWidget(panel)
+        scroll_layout.addWidget(panel)
 
         self.prompt_frame = QtWidgets.QFrame()
         self.prompt_frame.setStyleSheet("""
@@ -1296,9 +1343,11 @@ class ConfigWidget(QtWidgets.QWidget):
         prompt_btn_layout.addWidget(self.prompt_save_btn)
 
         prompt_layout.addLayout(prompt_btn_layout)
-        main_layout.addWidget(self.prompt_frame)
+        scroll_layout.addWidget(self.prompt_frame)
 
-        main_layout.addStretch()
+        scroll_layout.addStretch()
+        scroll_area.setWidget(scroll_content)
+        main_layout.addWidget(scroll_area)
 
         self.on_provider_changed(0)
 
@@ -1960,8 +2009,8 @@ class AIAssistantDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(i18n._("window_title"))
-        # 默认大小500x360（比之前小10%），不设置最小大小限制
-        self.resize(500, 360)
+        # 默认大小500x750（高度为宽度的1.5倍），不设置最小大小限制
+        self.resize(500, 750)
         # 启用最大化、最小化和关闭按钮
         self.setWindowFlags(
             QtCore.Qt.Window
@@ -2466,7 +2515,14 @@ class AIAssistantDialog(QtWidgets.QDialog):
                 "tool_result": i18n._("tool_result"),
                 "tool_error": i18n._("tool_error"),
             }.get(role, role)
-            widget.role_label.setText("<b>%s:</b>" % role_text)
+            if role == "thinking" and getattr(widget, "_thinking_collapsed", False):
+                collapsed = widget._thinking_collapsed
+                arrow = "▶" if collapsed else "▼"
+                widget.role_label.setText(
+                    "<b>%s %s:</b>" % (arrow, i18n._("thinking_content"))
+                )
+            else:
+                widget.role_label.setText("<b>%s:</b>" % role_text)
 
         # 更新配置和日志界面
         self.config_widget.update_language()
@@ -2578,6 +2634,13 @@ class AIAssistantDialog(QtWidgets.QDialog):
             self.worker.terminate()
             self.chat_widget.hide_loading()
             self.chat_widget.set_streaming_state(False)
+            if (
+                self.chat_widget.is_thinking
+                and self.chat_widget.current_message_widget
+                and self.chat_widget.current_message_widget.role == "thinking"
+            ):
+                self.chat_widget.current_message_widget.collapse_thinking_content()
+            self.chat_widget.is_thinking = False
             self.chat_widget.add_message("assistant", "[已停止]")
 
     def on_thinking(self, text, is_end):
@@ -2589,11 +2652,18 @@ class AIAssistantDialog(QtWidgets.QDialog):
             self.chat_widget.append_to_current(text)
         if is_end:
             self.chat_widget.is_thinking = False
+            if self.chat_widget.current_message_widget and self.chat_widget.current_message_widget.role == "thinking":
+                self.chat_widget.current_message_widget.collapse_thinking_content()
 
     def on_content(self, text, is_end):
         if text:
             if self.chat_widget.is_thinking:
                 self.chat_widget.is_thinking = False
+                if (
+                    self.chat_widget.current_message_widget
+                    and self.chat_widget.current_message_widget.role == "thinking"
+                ):
+                    self.chat_widget.current_message_widget.collapse_thinking_content()
                 self.chat_widget.start_message("assistant")
             elif (
                 not self.chat_widget.current_message_widget
@@ -2635,7 +2705,7 @@ class AIAssistantDialog(QtWidgets.QDialog):
         )
         self.chat_widget.add_message(
             "tool",
-            "使用工具: %s" % tool_name,
+            tool_name,
             tool_params=params,
             tool_name=tool_name,
             tool_result=result_text,
@@ -2644,6 +2714,13 @@ class AIAssistantDialog(QtWidgets.QDialog):
     def on_error(self, error_msg):
         # 记录错误到日志
         logger.logger.error(logger.ERRORS, "AI请求错误", {"error": error_msg})
+        if (
+            self.chat_widget.is_thinking
+            and self.chat_widget.current_message_widget
+            and self.chat_widget.current_message_widget.role == "thinking"
+        ):
+            self.chat_widget.current_message_widget.collapse_thinking_content()
+        self.chat_widget.is_thinking = False
         self.chat_widget.add_message("assistant", "错误: %s" % error_msg)
         self.chat_widget.hide_loading()
         self.chat_widget.set_streaming_state(False)
