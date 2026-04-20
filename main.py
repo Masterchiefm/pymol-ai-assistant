@@ -1474,6 +1474,7 @@ class ConfigWidget(QtWidgets.QWidget):
         self.max_tokens_spin.setValue(8000)
         self.timeout_spin.setValue(60)
         self.provider_combo.setCurrentIndex(0)
+        self.on_provider_changed(0)
 
     def on_new(self):
         self.clear_form()
