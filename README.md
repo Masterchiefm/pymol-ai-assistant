@@ -10,6 +10,9 @@
 
 ![Main Interface](fig/1.png)
 
+[![Watch Demo Video](fig/1.png)](https://www.bilibili.com/video/BV1dWF4zDExY)
+> 📺 [Click to watch demo video](https://www.bilibili.com/video/BV1dWF4zDExY)
+
 As shown in the screenshot, you only need to describe your needs in everyday language, and the AI will directly control PyMOL to complete complex molecular visualization tasks.
 
 ---
