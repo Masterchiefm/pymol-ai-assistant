@@ -871,6 +871,18 @@ class ConfigWidget(QtWidgets.QWidget):
         if hasattr(self, "export_btn"):
             self.export_btn.setText(i18n._("export_button"))
 
+        if hasattr(self, "do_cmd_label"):
+            self.do_cmd_label.setText(i18n._("prompt_pymol_do_command"))
+        if hasattr(self, "write_script_label"):
+            self.write_script_label.setText(i18n._("prompt_pymol_write_script"))
+        if hasattr(self, "prompt_save_btn"):
+            self.prompt_save_btn.setText(i18n._("save_prompts"))
+        if hasattr(self, "prompt_reset_btn"):
+            self.prompt_reset_btn.setText(i18n._("reset_prompts"))
+        if hasattr(self, "prompt_toggle"):
+            suffix = " ▲" if self.prompt_frame.isVisible() else ""
+            self.prompt_toggle.setText("📝 " + i18n._("prompt_config_title") + suffix)
+
         self.update_provider_combo()
         if hasattr(self, "register_link_label"):
             provider_id = self.provider_combo.currentData()
@@ -1209,6 +1221,100 @@ class ConfigWidget(QtWidgets.QWidget):
         panel_layout.addLayout(io_layout)
 
         main_layout.addWidget(panel)
+
+        self.prompt_toggle = QtWidgets.QPushButton("📝 " + i18n._("prompt_config_title"))
+        self.prompt_toggle.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #5DADE2;
+                border: none;
+                font-size: 12px;
+                text-align: left;
+                padding: 3px 0;
+            }
+            QPushButton:hover {
+                color: #7EC8E3;
+            }
+        """)
+        self.prompt_toggle.clicked.connect(self.toggle_prompt_section)
+        main_layout.addWidget(self.prompt_toggle)
+
+        self.prompt_frame = QtWidgets.QFrame()
+        self.prompt_frame.setStyleSheet("""
+            QFrame {
+                background-color: #404040;
+                border-radius: 15px;
+                border: none;
+            }
+        """)
+        prompt_layout = QtWidgets.QVBoxLayout(self.prompt_frame)
+        prompt_layout.setContentsMargins(25, 15, 25, 15)
+        prompt_layout.setSpacing(10)
+
+        from . import tools
+        custom_prompts = config.config_manager.get_tool_prompts()
+
+        prompt_hint = QtWidgets.QLabel(i18n._("prompt_config_hint"))
+        prompt_hint.setStyleSheet("color: #AAAAAA; font-size: 12px;")
+        prompt_hint.setWordWrap(True)
+        prompt_layout.addWidget(prompt_hint)
+
+        self.do_cmd_label = QtWidgets.QLabel(i18n._("prompt_pymol_do_command"))
+        self.do_cmd_label.setStyleSheet("color: #CCCCCC; font-size: 13px;")
+        prompt_layout.addWidget(self.do_cmd_label)
+
+        text_edit_style = """
+            QTextEdit {
+                background-color: #4A4A4A;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-family: Consolas, Monaco, monospace;
+                font-size: 13px;
+            }
+            QTextEdit:focus {
+                border: 2px solid #5DADE2;
+            }
+        """
+
+        self.do_cmd_edit = QtWidgets.QTextEdit()
+        self.do_cmd_edit.setPlainText(
+            custom_prompts.get("pymol_do_command", tools.DEFAULT_PYMOL_DO_COMMAND_DESCRIPTION)
+        )
+        self.do_cmd_edit.setStyleSheet(text_edit_style)
+        self.do_cmd_edit.setMinimumHeight(150)
+        prompt_layout.addWidget(self.do_cmd_edit)
+
+        self.write_script_label = QtWidgets.QLabel(i18n._("prompt_pymol_write_script"))
+        self.write_script_label.setStyleSheet("color: #CCCCCC; font-size: 13px;")
+        prompt_layout.addWidget(self.write_script_label)
+
+        self.write_script_edit = QtWidgets.QTextEdit()
+        self.write_script_edit.setPlainText(
+            custom_prompts.get("pymol_write_script", tools.DEFAULT_PYMOL_WRITE_SCRIPT_DESCRIPTION)
+        )
+        self.write_script_edit.setStyleSheet(text_edit_style)
+        self.write_script_edit.setMinimumHeight(150)
+        prompt_layout.addWidget(self.write_script_edit)
+
+        prompt_btn_layout = QtWidgets.QHBoxLayout()
+        prompt_btn_layout.setSpacing(8)
+
+        self.prompt_reset_btn = StyledButton(i18n._("reset_prompts"))
+        self.prompt_reset_btn.clicked.connect(self.on_reset_prompts)
+        prompt_btn_layout.addWidget(self.prompt_reset_btn)
+
+        prompt_btn_layout.addStretch()
+
+        self.prompt_save_btn = StyledButton(i18n._("save_prompts"), accent=True)
+        self.prompt_save_btn.clicked.connect(self.on_save_prompts)
+        prompt_btn_layout.addWidget(self.prompt_save_btn)
+
+        prompt_layout.addLayout(prompt_btn_layout)
+        self.prompt_frame.hide()
+        main_layout.addWidget(self.prompt_frame)
+
         main_layout.addStretch()
 
         self.on_provider_changed(0)
@@ -1221,6 +1327,35 @@ class ConfigWidget(QtWidgets.QWidget):
         else:
             self.advanced_frame.show()
             self.advanced_toggle.setText(i18n._("hide_advanced"))
+
+    def toggle_prompt_section(self):
+        """切换提示词配置区域显示"""
+        if self.prompt_frame.isVisible():
+            self.prompt_frame.hide()
+            self.prompt_toggle.setText("📝 " + i18n._("prompt_config_title"))
+        else:
+            self.prompt_frame.show()
+            self.prompt_toggle.setText("📝 " + i18n._("prompt_config_title") + " ▲")
+
+    def on_save_prompts(self):
+        prompts = {
+            "pymol_do_command": self.do_cmd_edit.toPlainText(),
+            "pymol_write_script": self.write_script_edit.toPlainText(),
+        }
+        config.config_manager.set_tool_prompts(prompts)
+        QtWidgets.QMessageBox.information(
+            self, i18n._("save_prompts"), i18n._("prompts_saved")
+        )
+
+    def on_reset_prompts(self):
+        from . import tools
+        defaults = tools.get_default_tool_prompts()
+        self.do_cmd_edit.setPlainText(defaults["pymol_do_command"])
+        self.write_script_edit.setPlainText(defaults["pymol_write_script"])
+        config.config_manager.set_tool_prompts({})
+        QtWidgets.QMessageBox.information(
+            self, i18n._("reset_prompts"), i18n._("prompts_reset")
+        )
 
     def on_provider_changed(self, index):
         """提供商改变时更新模型列表和表单"""
@@ -1463,121 +1598,6 @@ class ConfigWidget(QtWidgets.QWidget):
 
     def show_error(self, msg):
         QtWidgets.QMessageBox.critical(self, "Error", msg)
-
-
-class PromptConfigWidget(QtWidgets.QWidget):
-    """提示词配置标签页"""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setup_ui()
-
-    def update_language(self):
-        if hasattr(self, "do_cmd_label"):
-            self.do_cmd_label.setText(i18n._("prompt_pymol_do_command"))
-        if hasattr(self, "write_script_label"):
-            self.write_script_label.setText(i18n._("prompt_pymol_write_script"))
-        if hasattr(self, "save_btn"):
-            self.save_btn.setText(i18n._("save_prompts"))
-        if hasattr(self, "reset_btn"):
-            self.reset_btn.setText(i18n._("reset_prompts"))
-
-    def setup_ui(self):
-        main_layout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
-
-        panel = QtWidgets.QFrame()
-        panel.setStyleSheet("""
-            QFrame {
-                background-color: #404040;
-                border-radius: 15px;
-                border: none;
-            }
-        """)
-        panel_layout = QtWidgets.QVBoxLayout(panel)
-        panel_layout.setContentsMargins(25, 20, 25, 20)
-        panel_layout.setSpacing(12)
-
-        from . import tools
-
-        custom_prompts = config.config_manager.get_tool_prompts()
-
-        self.do_cmd_label = QtWidgets.QLabel(i18n._("prompt_pymol_do_command"))
-        self.do_cmd_label.setStyleSheet("color: #CCCCCC; font-size: 14px;")
-        panel_layout.addWidget(self.do_cmd_label)
-
-        self.do_cmd_edit = QtWidgets.QTextEdit()
-        self.do_cmd_edit.setPlainText(
-            custom_prompts.get("pymol_do_command", tools.DEFAULT_PYMOL_DO_COMMAND_DESCRIPTION)
-        )
-        self.do_cmd_edit.setStyleSheet("""
-            QTextEdit {
-                background-color: #4A4A4A;
-                color: #FFFFFF;
-                border: none;
-                border-radius: 8px;
-                padding: 8px 12px;
-                font-family: Consolas, Monaco, monospace;
-                font-size: 13px;
-            }
-            QTextEdit:focus {
-                border: 2px solid #5DADE2;
-            }
-        """)
-        self.do_cmd_edit.setMinimumHeight(200)
-        panel_layout.addWidget(self.do_cmd_edit)
-
-        self.write_script_label = QtWidgets.QLabel(i18n._("prompt_pymol_write_script"))
-        self.write_script_label.setStyleSheet("color: #CCCCCC; font-size: 14px;")
-        panel_layout.addWidget(self.write_script_label)
-
-        self.write_script_edit = QtWidgets.QTextEdit()
-        self.write_script_edit.setPlainText(
-            custom_prompts.get("pymol_write_script", tools.DEFAULT_PYMOL_WRITE_SCRIPT_DESCRIPTION)
-        )
-        self.write_script_edit.setStyleSheet(self.do_cmd_edit.styleSheet())
-        self.write_script_edit.setMinimumHeight(200)
-        panel_layout.addWidget(self.write_script_edit)
-
-        btn_layout = QtWidgets.QHBoxLayout()
-        btn_layout.setSpacing(8)
-
-        self.reset_btn = StyledButton(i18n._("reset_prompts"))
-        self.reset_btn.clicked.connect(self.on_reset)
-        btn_layout.addWidget(self.reset_btn)
-
-        btn_layout.addStretch()
-
-        self.save_btn = StyledButton(i18n._("save_prompts"), accent=True)
-        self.save_btn.clicked.connect(self.on_save)
-        btn_layout.addWidget(self.save_btn)
-
-        panel_layout.addLayout(btn_layout)
-
-        main_layout.addWidget(panel)
-        main_layout.addStretch()
-
-    def on_save(self):
-        prompts = {
-            "pymol_do_command": self.do_cmd_edit.toPlainText(),
-            "pymol_write_script": self.write_script_edit.toPlainText(),
-        }
-        config.config_manager.set_tool_prompts(prompts)
-        QtWidgets.QMessageBox.information(
-            self, i18n._("save_prompts"), i18n._("prompts_saved")
-        )
-
-    def on_reset(self):
-        from . import tools
-
-        defaults = tools.get_default_tool_prompts()
-        self.do_cmd_edit.setPlainText(defaults["pymol_do_command"])
-        self.write_script_edit.setPlainText(defaults["pymol_write_script"])
-        config.config_manager.set_tool_prompts({})
-        QtWidgets.QMessageBox.information(
-            self, i18n._("reset_prompts"), i18n._("prompts_reset")
-        )
 
 
 class LogWidget(QtWidgets.QWidget):
@@ -2071,10 +2091,6 @@ class AIAssistantDialog(QtWidgets.QDialog):
         self.config_widget.config_changed.connect(self.on_config_changed)
         self.tabs.addTab(self.config_widget, i18n._("tab_config"))
 
-        # 提示词配置标签页
-        self.prompt_config_widget = PromptConfigWidget()
-        self.tabs.addTab(self.prompt_config_widget, i18n._("tab_prompt"))
-
         # 日志标签页
         self.log_widget = LogWidget()
         self.tabs.addTab(self.log_widget, i18n._("tab_log"))
@@ -2453,8 +2469,7 @@ class AIAssistantDialog(QtWidgets.QDialog):
         # 更新标签页标题
         self.tabs.setTabText(0, i18n._("tab_chat"))
         self.tabs.setTabText(1, i18n._("tab_config"))
-        self.tabs.setTabText(2, i18n._("tab_prompt"))
-        self.tabs.setTabText(3, i18n._("tab_log"))
+        self.tabs.setTabText(2, i18n._("tab_log"))
 
         # 更新聊天组件
         self.chat_widget.input_text.setPlaceholderText(i18n._("input_placeholder"))
@@ -2478,9 +2493,8 @@ class AIAssistantDialog(QtWidgets.QDialog):
             }.get(role, role)
             widget.role_label.setText("<b>%s:</b>" % role_text)
 
-        # 更新配置、提示词和日志界面
+        # 更新配置和日志界面
         self.config_widget.update_language()
-        self.prompt_config_widget.update_language()
         self.log_widget.update_language()
 
     def show_about_dialog(self):
