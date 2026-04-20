@@ -8,8 +8,6 @@
 > 
 > **简体中文**（当前）| [English](README.md)
 
-![主界面](fig/1.png)
-
 [![观看演示视频](fig/1.png)](https://www.bilibili.com/video/BV1dWF4zDExY)
 > 📺 [点击观看演示视频](https://www.bilibili.com/video/BV1dWF4zDExY)
 

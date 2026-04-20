@@ -8,8 +8,6 @@
 > 
 > [简体中文](README_zh.md) | **English** (Current)
 
-![Main Interface](fig/1.png)
-
 [![Watch Demo Video](fig/1.png)](https://www.bilibili.com/video/BV1dWF4zDExY)
 > 📺 [Click to watch demo video](https://www.bilibili.com/video/BV1dWF4zDExY)
 
