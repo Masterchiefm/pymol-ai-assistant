@@ -879,9 +879,6 @@ class ConfigWidget(QtWidgets.QWidget):
             self.prompt_save_btn.setText(i18n._("save_prompts"))
         if hasattr(self, "prompt_reset_btn"):
             self.prompt_reset_btn.setText(i18n._("reset_prompts"))
-        if hasattr(self, "prompt_toggle"):
-            suffix = " ▲" if self.prompt_frame.isVisible() else ""
-            self.prompt_toggle.setText("📝 " + i18n._("prompt_config_title") + suffix)
 
         self.update_provider_combo()
         if hasattr(self, "register_link_label"):
@@ -912,30 +909,7 @@ class ConfigWidget(QtWidgets.QWidget):
     def setup_ui(self):
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
-
-        self.scroll_area = QtWidgets.QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setStyleSheet("""
-            QScrollArea { background: transparent; border: none; }
-            QScrollBar:vertical {
-                background: #2D2D2D;
-                width: 8px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:vertical {
-                background: #666666;
-                border-radius: 4px;
-                min-height: 20px;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-        """)
-
-        container = QtWidgets.QWidget()
-        container_layout = QtWidgets.QVBoxLayout(container)
-        container_layout.setContentsMargins(0, 0, 0, 0)
-        container_layout.setSpacing(15)
+        main_layout.setSpacing(15)
 
         panel = QtWidgets.QFrame()
         panel.setStyleSheet("""
@@ -1243,24 +1217,7 @@ class ConfigWidget(QtWidgets.QWidget):
         io_layout.addStretch()
         panel_layout.addLayout(io_layout)
 
-        container_layout.addWidget(panel)
-
-        self.prompt_toggle = QtWidgets.QPushButton("📝 " + i18n._("prompt_config_title"))
-        self.prompt_toggle.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #5DADE2;
-                border: none;
-                font-size: 12px;
-                text-align: left;
-                padding: 3px 0;
-            }
-            QPushButton:hover {
-                color: #7EC8E3;
-            }
-        """)
-        self.prompt_toggle.clicked.connect(self.toggle_prompt_section)
-        container_layout.addWidget(self.prompt_toggle)
+        main_layout.addWidget(panel)
 
         self.prompt_frame = QtWidgets.QFrame()
         self.prompt_frame.setStyleSheet("""
@@ -1276,6 +1233,10 @@ class ConfigWidget(QtWidgets.QWidget):
 
         from . import tools
         custom_prompts = config.config_manager.get_tool_prompts()
+
+        prompt_title = QtWidgets.QLabel(i18n._("prompt_config_title"))
+        prompt_title.setStyleSheet("color: #5DADE2; font-size: 13px; font-weight: bold;")
+        prompt_layout.addWidget(prompt_title)
 
         prompt_hint = QtWidgets.QLabel(i18n._("prompt_config_hint"))
         prompt_hint.setStyleSheet("color: #AAAAAA; font-size: 12px;")
@@ -1335,12 +1296,9 @@ class ConfigWidget(QtWidgets.QWidget):
         prompt_btn_layout.addWidget(self.prompt_save_btn)
 
         prompt_layout.addLayout(prompt_btn_layout)
-        self.prompt_frame.hide()
-        container_layout.addWidget(self.prompt_frame)
+        main_layout.addWidget(self.prompt_frame)
 
-        container_layout.addStretch()
-        self.scroll_area.setWidget(container)
-        main_layout.addWidget(self.scroll_area)
+        main_layout.addStretch()
 
         self.on_provider_changed(0)
 
@@ -1352,15 +1310,6 @@ class ConfigWidget(QtWidgets.QWidget):
         else:
             self.advanced_frame.show()
             self.advanced_toggle.setText(i18n._("hide_advanced"))
-
-    def toggle_prompt_section(self):
-        """切换提示词配置区域显示"""
-        if self.prompt_frame.isVisible():
-            self.prompt_frame.hide()
-            self.prompt_toggle.setText("📝 " + i18n._("prompt_config_title"))
-        else:
-            self.prompt_frame.show()
-            self.prompt_toggle.setText("📝 " + i18n._("prompt_config_title") + " ▲")
 
     def on_save_prompts(self):
         prompts = {
