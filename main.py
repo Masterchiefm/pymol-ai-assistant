@@ -23,8 +23,26 @@ from . import (
 )
 
 
-# 版本号
 __version__ = PLUGIN_VERSION
+
+_FONT_FAMILY = None
+
+
+def _load_custom_fonts():
+    global _FONT_FAMILY
+    font_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+    if not os.path.isdir(font_dir):
+        return
+    font_db = QtGui.QFontDatabase()
+    for fname in os.listdir(font_dir):
+        if fname.lower().endswith(".ttf"):
+            fid = font_db.addApplicationFont(os.path.join(font_dir, fname))
+            if fid != -1:
+                families = font_db.applicationFontFamilies(fid)
+                if families and _FONT_FAMILY is None:
+                    _FONT_FAMILY = families[0]
+    if _FONT_FAMILY:
+        print("[PyMOL AI Assistant] 已加载字体: {}".format(_FONT_FAMILY))
 
 
 # 颜色定义 - 深色主题
@@ -2008,6 +2026,15 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
+        _load_custom_fonts()
+        if _FONT_FAMILY:
+            app = QtWidgets.QApplication.instance()
+            if app:
+                base_font = app.font()
+                base_font.setFamily(_FONT_FAMILY)
+                app.setFont(base_font)
+
         self.setWindowTitle(i18n._("window_title"))
         # 默认大小500x750（高度为宽度的1.5倍），不设置最小大小限制
         self.resize(500, 750)
