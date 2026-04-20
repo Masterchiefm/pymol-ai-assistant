@@ -35,62 +35,7 @@ def supports_parallel_function_calling(model: str) -> bool:
         return False
 
 
-def get_tool_definitions(is_vision_model: bool = False) -> List[Dict[str, Any]]:
-    """
-    获取所有工具的定义（用于 OpenAI Function Calling）
-
-    Args:
-        is_vision_model: 是否为视觉模型，如果是则包含截图工具
-    """
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "pymol_fetch",
-                "description": "从 PDB 数据库下载并加载分子结构。支持 PDB ID（如 1ake）或 mmCIF 格式。",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "code": {
-                            "type": "string",
-                            "description": "PDB ID，如 '1ake', '1abc'",
-                        },
-                        "name": {
-                            "type": "string",
-                            "description": "对象名称（可选，默认使用 PDB ID）",
-                        },
-                    },
-                    "required": ["code"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "pymol_load",
-                "description": "从本地文件加载分子结构。支持 PDB、mmCIF、MOL2 等格式。",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "filename": {
-                            "type": "string",
-                            "description": "文件路径，如 '/path/to/protein.pdb'",
-                        },
-                        "name": {"type": "string", "description": "对象名称（可选）"},
-                        "format": {
-                            "type": "string",
-                            "description": "文件格式（可选，如 'pdb', 'cif', 'mol2'，默认自动检测）",
-                        },
-                    },
-                    "required": ["filename"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "pymol_write_script",
-                "description": """在系统临时文件夹中创建脚本文件，支持 Python (.py) 和 PyMOL 命令脚本 (.pml) 两种格式。创建后使用 pymol_run_script 执行。
+DEFAULT_PYMOL_WRITE_SCRIPT_DESCRIPTION = """在系统临时文件夹中创建脚本文件，支持 Python (.py) 和 PyMOL 命令脚本 (.pml) 两种格式。创建后使用 pymol_run_script 执行。
 
 【脚本类型选择】
 1. Python 脚本 (.py):
@@ -237,7 +182,80 @@ zoom
 - Python 脚本中的 print 输出会被捕获并返回给 AI
 - .pml 脚本中每行一条命令，# 为注释
 - .pml 文件不支持变量、循环、条件判断等编程结构
-- 创建脚本后必须使用 pymol_run_script 来执行""",
+- 创建脚本后必须使用 pymol_run_script 来执行"""
+
+DEFAULT_PYMOL_DO_COMMAND_DESCRIPTION = "执行一个或多个 PyMOL 命令。多个命令可以用换行符或分号分隔。适用于快速执行简单命令。\n\n可用命令分类：\n\n【文件加载】\n- load [文件名], [对象名], [格式] - 加载本地文件（pdb, cif, mol2, sdf等）\n- fetch [PDB码], [对象名] - 从PDB数据库下载结构\n- run [脚本文件] - 执行Python脚本\n- @ [pml脚本文件] - 执行PyMOL命令脚本\n\n【显示控制】\n- show [表示形式], [选择] - 显示指定表示形式\n  表示形式: lines, sticks, spheres, surface, mesh, ribbon, cartoon, dots, labels, nonbonded, everything\n  示例: show cartoon, chain A\n- hide [表示形式], [选择] - 隐藏指定表示形式\n  示例: hide sticks, all\n- enable [对象名] - 启用对象\n- disable [对象名] - 禁用对象\n\n【颜色设置】\n- color [颜色], [选择] - 设置选择区域颜色\n  颜色: red, green, blue, yellow, cyan, magenta, white, black, gray, orange, purple, pink\n  特殊: rainbow（彩虹色）, ss（按二级结构）, by_chain（按链）, by_resi（按残基）, by_element（按元素）\n  示例: color red, chain A; color rainbow, all\n- bg_color [颜色] - 设置背景颜色\n  示例: bg_color white\n- set_color [颜色名], [RGB值] - 定义新颜色\n  示例: set_color mycolor, [0.5, 0.8, 0.2]\n\n【视图控制】\n- zoom [选择], [缓冲], [状态] - 缩放到指定选择\n  示例: zoom; zoom chain A, buffer=2\n- center [选择] - 将视图中心移动到指定选择\n  示例: center chain A\n- reset - 重置视图到默认状态\n- orient - 沿主轴对齐结构\n- clip [near], [far] - 设置裁剪平面\n  示例: clip near=-5, far=20\n\n【旋转和移动】\n- rotate [轴], [角度], [选择] - 旋转\n  轴: x, y, z\n  示例: rotate x, 30, chain A\n- turn [轴], [角度] - 旋转相机\n  示例: turn y, 45\n- move [x], [y], [z], [选择] - 移动原子\n  示例: move 5, 0, 0, chain A\n- translate [x], [y], [z], [选择] - 平移选择\n  示例: translate 10, 0, 0, all\n\n【选择操作】\n- select [名称], [选择表达式] - 创建命名选择集\n  选择表达式语法：\n  - chain [链ID]: chain A, chain B\n  - resi [残基号]: resi 50, resi 1-100\n  - resn [残基名]: resn ASP, resn HIS\n  - name [原子名]: name CA, name N+O\n  - elem [元素]: elem C, elem O+N\n  - byres(选择): 按残基选择\n  - bychain(选择): 按链选择\n  - within [距离] of [选择]: 在指定距离内\n  - around [距离]: 周围指定距离\n  - and, or, not: 逻辑运算符\n  示例: select active_site, resi 50-60; select heme, resn HEM\n- deselect - 取消所有选择\n- pop [名称], [源选择] - 遍历选择中的原子\n\n【测量】\n- distance [名称], [选择1], [选择2] - 测量距离\n  示例: distance d1, /1abc//A/50/CA, /1abc//A/100/CA\n- angle [名称], [选择1], [选择2], [选择3] - 测量角度\n  示例: angle a1, /1abc//A/50/CA, /1abc//A/50/C, /1abc//A/50/N\n- dihedral [名称], [选择1], [选择2], [选择3], [选择4] - 测量二面角\n- get_distance [选择1], [选择2] - 获取距离值\n\n【编辑操作】\n- remove [选择] - 删除选择中的原子\n- create [新对象], [源选择] - 从选择创建新对象\n- copy [目标], [源] - 复制对象\n- split_states [对象] - 按状态拆分\n- h_add [选择] - 加氢\n- remove_h [选择] - 删氢\n- alter [选择], [表达式] - 修改原子属性\n- set_symmetry [对象], [空间群], [a], [b], [c], [alpha], [beta], [gamma]\n\n【设置】\n- set [参数], [值], [选择] - 设置PyMOL参数\n  常用参数: ray_shadows, ray_trace_mode, cartoon_cylindrical_helices,\n  bg_gradient, transparency, sphere_scale, stick_radius, line_width,\n  cartoon_loop_radius, cartoon_oval_width, label_size, antialias,\n  ray_trace_disco_factor, ray_trace_gain, ambient, specular,\n  cartoon_side_chain_helper, surface_quality, valence, mesh_width,\n  defer_updates\n\n【渲染与图像】\n- ray [宽], [高] - 光线追踪渲染\n- png [文件名], [dpi], [ray] - 保存图像\n- isomesh [名称], [地图], [阈值], [选择] - 创建网格面\n- isosurface [名称], [地图], [阈值], [选择] - 创建等值面\n\n【其他】\n- dss [选择] - 二级结构分配\n- smooth [选择], [周期] - 平滑\n- intra_fit [选择], [状态] - 内部叠合\n- fit [移动选择], [目标选择] - 叠合\n- align [移动], [目标] - 序列叠合\n- save [文件名], [选择] - 保存结构"
+
+
+def get_default_tool_prompts():
+    """获取默认工具提示词"""
+    return {
+        "pymol_do_command": DEFAULT_PYMOL_DO_COMMAND_DESCRIPTION,
+        "pymol_write_script": DEFAULT_PYMOL_WRITE_SCRIPT_DESCRIPTION,
+    }
+
+
+def get_tool_definitions(is_vision_model: bool = False, custom_prompts: Dict[str, str] = None) -> List[Dict[str, Any]]:
+    """
+    获取所有工具的定义（用于 OpenAI Function Calling）
+
+    Args:
+        is_vision_model: 是否为视觉模型，如果是则包含截图工具
+        custom_prompts: 自定义工具提示词字典 {tool_name: description}
+    """
+    prompts = custom_prompts or {}
+    write_script_desc = prompts.get("pymol_write_script", DEFAULT_PYMOL_WRITE_SCRIPT_DESCRIPTION)
+    do_command_desc = prompts.get("pymol_do_command", DEFAULT_PYMOL_DO_COMMAND_DESCRIPTION)
+
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_fetch",
+                "description": "从 PDB 数据库下载并加载分子结构。支持 PDB ID（如 1ake）或 mmCIF 格式。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "description": "PDB ID，如 '1ake', '1abc'",
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "对象名称（可选，默认使用 PDB ID）",
+                        },
+                    },
+                    "required": ["code"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_load",
+                "description": "从本地文件加载分子结构。支持 PDB、mmCIF、MOL2 等格式。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {
+                            "type": "string",
+                            "description": "文件路径，如 '/path/to/protein.pdb'",
+                        },
+                        "name": {"type": "string", "description": "对象名称（可选）"},
+                        "format": {
+                            "type": "string",
+                            "description": "文件格式（可选，如 'pdb', 'cif', 'mol2'，默认自动检测）",
+                        },
+                    },
+                    "required": ["filename"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pymol_write_script",
+                "description": write_script_desc,
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -304,7 +322,7 @@ zoom
             "type": "function",
             "function": {
                 "name": "pymol_do_command",
-                "description": "执行一个或多个 PyMOL 命令。多个命令可以用换行符或分号分隔。适用于快速执行简单命令。\n\n可用命令分类：\n\n【文件加载】\n- load [文件名], [对象名], [格式] - 加载本地文件（pdb, cif, mol2, sdf等）\n- fetch [PDB码], [对象名] - 从PDB数据库下载结构\n- run [脚本文件] - 执行Python脚本\n- @ [pml脚本文件] - 执行PyMOL命令脚本\n\n【显示控制】\n- show [表示形式], [选择] - 显示指定表示形式\n  表示形式: lines, sticks, spheres, surface, mesh, ribbon, cartoon, dots, labels, nonbonded, everything\n  示例: show cartoon, chain A\n- hide [表示形式], [选择] - 隐藏指定表示形式\n  示例: hide sticks, all\n- enable [对象名] - 启用对象\n- disable [对象名] - 禁用对象\n\n【颜色设置】\n- color [颜色], [选择] - 设置选择区域颜色\n  颜色: red, green, blue, yellow, cyan, magenta, white, black, gray, orange, purple, pink\n  特殊: rainbow（彩虹色）, ss（按二级结构）, by_chain（按链）, by_resi（按残基）, by_element（按元素）\n  示例: color red, chain A; color rainbow, all\n- bg_color [颜色] - 设置背景颜色\n  示例: bg_color white\n- set_color [颜色名], [RGB值] - 定义新颜色\n  示例: set_color mycolor, [0.5, 0.8, 0.2]\n\n【视图控制】\n- zoom [选择], [缓冲], [状态] - 缩放到指定选择\n  示例: zoom; zoom chain A, buffer=2\n- center [选择] - 将视图中心移动到指定选择\n  示例: center chain A\n- reset - 重置视图到默认状态\n- orient - 沿主轴对齐结构\n- clip [near], [far] - 设置裁剪平面\n  示例: clip near=-5, far=20\n\n【旋转和移动】\n- rotate [轴], [角度], [选择] - 旋转\n  轴: x, y, z\n  示例: rotate x, 30, chain A\n- turn [轴], [角度] - 旋转相机\n  示例: turn y, 45\n- move [x], [y], [z], [选择] - 移动原子\n  示例: move 5, 0, 0, chain A\n- translate [x], [y], [z], [选择] - 平移选择\n  示例: translate 10, 0, 0, all\n\n【选择操作】\n- select [名称], [选择表达式] - 创建命名选择集\n  选择表达式语法：\n  - chain [链ID]: chain A, chain B\n  - resi [残基号]: resi 50, resi 1-100\n  - resn [残基名]: resn ASP, resn HIS\n  - name [原子名]: name CA, name N+O\n  - elem [元素]: elem C, elem O+N\n  - byres(选择): 按残基选择\n  - bychain(选择): 按链选择\n  - within [距离] of [选择]: 在指定距离内\n  - around [距离]: 周围指定距离\n  - and, or, not: 逻辑运算符\n  示例: select active_site, resi 50-60; select heme, resn HEM\n- deselect - 取消所有选择\n- pop [名称], [源选择] - 遍历选择中的原子\n\n【测量】\n- distance [名称], [选择1], [选择2] - 测量距离\n  示例: distance d1, /1abc//A/50/CA, /1abc//A/100/CA\n- angle [名称], [选择1], [选择2], [选择3] - 测量角度\n- dihedral [名称], [选择1], [选择2], [选择3], [选择4] - 测量二面角\n- get_distance [选择1], [选择2] - 获取距离值\n- get_angle [选择1], [选择2], [选择3] - 获取角度值\n- get_dihedral [选择1], [选择2], [选择3], [选择4] - 获取二面角值\n\n【结构操作】\n- remove [选择] - 删除原子\n  示例: remove water; remove solvent\n- delete [对象或选择名] - 删除对象或选择\n- alter [选择], [表达式] - 修改原子属性\n  示例: alter chain A and resi 50, b=50.0\n- alter_state [状态], [选择], [表达式] - 修改指定状态的原子属性\n- replace [选择], [残基名] - 替换残基\n- attach [片段], [氢] - 添加片段\n- h_add [选择] - 添加氢原子\n- h_fill [选择] - 填充氢原子\n- h_fix [选择] - 修复氢原子\n- unbond [选择1], [选择2] - 断开键\n- bond [选择1], [选择2] - 创建键\n- fuse [选择1], [选择2] - 融合选择\n\n【结构分析】\n- dss - 计算二级结构\n- identify [选择] - 识别原子\n- get_model [选择] - 获取分子模型\n- get_extent [选择] - 获取范围\n- count_atoms [选择] - 统计原子数\n- get_chains [选择] - 获取链列表\n\n【对齐和拟合】\n- align [移动], [目标] - 序列/结构对齐\n  示例: align 1abc, 2def\n- fit [移动], [目标] - 拟合结构\n- pair_fit [移动1], [目标1], [移动2], [目标2] - 成对拟合\n- rms [选择1], [选择2] - 计算RMSD\n- super [选择1], [选择2] - 超级对齐\n\n【渲染和导出】\n- ray [宽], [高] - 光线追踪渲染\n  示例: ray 1600, 1200\n- png [文件名], [dpi], [ray] - 保存PNG图像\n  示例: png image.png, dpi=300, ray=1\n- save [文件名], [格式], [选择] - 保存结构\n  格式: pdb, mae, sdf等\n  示例: save output.pdb\n- save session [文件名] - 保存会话\n\n【设置】\n- set [设置名], [值], [选择] - 设置参数\n  常用设置:\n  - ray_shadows: on/off - 阴影\n  - cartoon_tube_radius: 数值 - 管状半径\n  - cartoon_cylindrical_helices: on/off - 圆柱螺旋\n  - bg_gradient: on/off, 颜色1, 颜色2 - 背景渐变\n  - transparency: 0-1 - 透明度\n  - sphere_scale: 数值 - 球体大小\n  示例: set ray_shadows, on; set transparency, 0.5\n- unset [设置名] - 取消设置\n\n【其他】\n- cls - 清屏\n- help [命令名] - 显示帮助\n- quit - 退出\n- refresh - 刷新显示\n- rebuild - 重建显示\n- stereo on/off - 立体模式\n- undo - 撤销\n- redo - 重做",
+                "description": do_command_desc,
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -1171,50 +1189,50 @@ class ToolExecutor:
             # 清除之前的反馈
             cmd._get_feedback()
 
-            # 捕获标准输出
             old_stdout = sys.stdout
-            captured_output = StringIO()
+            old_stderr = sys.stderr
+            captured_stdout = StringIO()
+            captured_stderr = StringIO()
 
             try:
-                sys.stdout = captured_output
+                sys.stdout = captured_stdout
+                sys.stderr = captured_stderr
 
-                # 根据文件类型执行
                 if ext == ".pml":
-                    # 读取 pml 文件内容并使用 cmd.do 执行
                     with open(expanded_path, "r", encoding="utf-8") as f:
                         pml_content = f.read()
                     cmd.do(pml_content)
                     script_type = "PyMOL"
                 else:
-                    # Python 脚本使用 cmd.run 执行
                     cmd.run(expanded_path, namespace=namespace)
                     script_type = "Python"
 
-                # 恢复标准输出
                 sys.stdout = old_stdout
+                sys.stderr = old_stderr
 
-                # 获取捕获的输出
-                script_output = captured_output.getvalue()
+                stdout_text = captured_stdout.getvalue()
+                stderr_text = captured_stderr.getvalue()
 
-                # 获取 PyMOL 反馈
                 feedback = cmd._get_feedback()
                 feedback_text = "\n".join(feedback) if feedback else ""
 
-                # 合并输出
                 combined_output = ""
-                if script_output:
-                    combined_output += script_output
-                if feedback_text:
+                if stdout_text.strip():
+                    combined_output += stdout_text.strip()
+                if stderr_text.strip():
                     if combined_output:
-                        combined_output += "\n\n"
-                    combined_output += feedback_text
+                        combined_output += "\n"
+                    combined_output += "STDERR: " + stderr_text.strip()
+                if feedback_text.strip():
+                    if combined_output:
+                        combined_output += "\n"
+                    combined_output += feedback_text.strip()
 
-                # 检查是否有错误
                 has_error = False
-                if feedback_text and (
-                    "Error" in feedback_text
-                    or "error" in feedback_text.lower()
-                    or "Traceback" in feedback_text
+                all_text = combined_output.lower()
+                if any(
+                    kw in all_text
+                    for kw in ["error", "traceback", "exception"]
                 ):
                     has_error = True
 
@@ -1226,7 +1244,6 @@ class ToolExecutor:
                         "error": feedback_text[:500] if feedback_text else "",
                     }
 
-                # 根据脚本类型返回不同的消息
                 if ext == ".pml":
                     message = f"成功执行 PyMOL 脚本: {os.path.basename(filename)}"
                 else:
@@ -1235,11 +1252,19 @@ class ToolExecutor:
                 return {"success": True, "message": message, "output": combined_output}
 
             except Exception as e:
-                # 确保恢复标准输出
                 sys.stdout = old_stdout
+                sys.stderr = old_stderr
 
-                # 获取捕获的输出（如果有）
-                script_output = captured_output.getvalue()
+                stdout_text = captured_stdout.getvalue()
+                stderr_text = captured_stderr.getvalue()
+
+                combined = ""
+                if stdout_text.strip():
+                    combined += stdout_text.strip()
+                if stderr_text.strip():
+                    if combined:
+                        combined += "\n"
+                    combined += "STDERR: " + stderr_text.strip()
 
                 error_msg = f"执行脚本失败: {str(e)}"
                 tb = traceback.format_exc()
@@ -1247,7 +1272,7 @@ class ToolExecutor:
                 return {
                     "success": False,
                     "message": error_msg,
-                    "output": script_output if script_output else "",
+                    "output": combined if combined else "",
                     "error": tb,
                 }
 
@@ -1269,6 +1294,13 @@ class ToolExecutor:
 
                 processed_command = self._preprocess_command(cmd, command)
 
+                old_stdout = sys.stdout
+                old_stderr = sys.stderr
+                captured_stdout = StringIO()
+                captured_stderr = StringIO()
+                sys.stdout = captured_stdout
+                sys.stderr = captured_stderr
+
                 try:
                     if processed_command != command:
                         for cmd_part in processed_command.split(";"):
@@ -1278,19 +1310,42 @@ class ToolExecutor:
                     else:
                         cmd.do(command)
                 except Exception as e:
+                    sys.stdout = old_stdout
+                    sys.stderr = old_stderr
+                    stdout_text = captured_stdout.getvalue().strip()
+                    stderr_text = captured_stderr.getvalue().strip()
                     has_error = True
+                    all_output = str(e)
+                    if stdout_text:
+                        all_output = stdout_text + "\n" + all_output
+                    if stderr_text:
+                        all_output += "\n" + stderr_text
                     results.append(
                         {
                             "command": command,
                             "status": "error",
-                            "message": str(e),
-                            "output": str(e),
+                            "message": all_output,
+                            "output": all_output,
                         }
                     )
                     continue
 
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
+
+                stdout_text = captured_stdout.getvalue().strip()
+                stderr_text = captured_stderr.getvalue().strip()
                 feedback = cmd._get_feedback()
                 feedback_text = "\n".join(feedback) if feedback else ""
+
+                output_parts = []
+                if stdout_text:
+                    output_parts.append(stdout_text)
+                if feedback_text:
+                    output_parts.append(feedback_text)
+                if stderr_text:
+                    output_parts.append(stderr_text)
+                combined = "\n".join(output_parts)
 
                 error_patterns = [
                     "Error:",
@@ -1301,7 +1356,7 @@ class ToolExecutor:
                     "Warning:",
                 ]
                 has_error_in_output = any(
-                    pattern in feedback_text for pattern in error_patterns
+                    pattern in combined for pattern in error_patterns
                 )
 
                 if has_error_in_output:
@@ -1310,8 +1365,8 @@ class ToolExecutor:
                         {
                             "command": command,
                             "status": "error",
-                            "message": feedback_text,
-                            "output": feedback_text,
+                            "message": combined,
+                            "output": combined,
                         }
                     )
                 else:
@@ -1320,7 +1375,7 @@ class ToolExecutor:
                             "command": command,
                             "status": "success",
                             "message": "命令执行成功",
-                            "output": feedback_text if feedback_text else "",
+                            "output": combined,
                         }
                     )
 

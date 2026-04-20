@@ -12,42 +12,40 @@ CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".pymol_ai_assistant_config.
 DEFAULT_CONFIG = {"current_config": None, "language": "zh", "configs": []}
 
 PROVIDERS = {
-    "openai": {
-        "name": "OpenAI",
-        "api_base": "https://api.openai.com/v1",
+    "siliconflow": {
+        "name": "SiliconFlow",
+        "api_base": "https://api.siliconflow.cn/v1",
         "models": [
-            "gpt-4o",
-            "gpt-4o-mini",
-            "gpt-4-turbo",
-            "gpt-4",
-            "gpt-3.5-turbo",
-            "o1",
-            "o1-mini",
-            "o1-preview",
+            "Pro/moonshotai/Kimi-K2.5",
+            "Pro/zai-org/GLM-5",
+            "Pro/zai-org/GLM-5.1",
+            "deepseek-ai/DeepSeek-V3.2",
+            "deepseek-ai/DeepSeek-V3",
         ],
         "prefix": "openai/",
         "requires_api_key": True,
         "requires_api_base": False,
         "requires_api_version": False,
+        "register_link": "https://cloud.siliconflow.cn/i/Su2ao83G",
     },
-    "azure": {
-        "name": "Azure OpenAI",
-        "api_base": "",
-        "models": [],
-        "prefix": "azure/",
+    "openai": {
+        "name": "OpenAI",
+        "api_base": "https://api.openai.com/v1",
+        "models": ["gpt-4.1", "gpt-4o", "gpt-4o-mini", "o3", "o4-mini"],
+        "prefix": "openai/",
         "requires_api_key": True,
-        "requires_api_base": True,
-        "requires_api_version": True,
+        "requires_api_base": False,
+        "requires_api_version": False,
     },
     "anthropic": {
         "name": "Anthropic (Claude)",
         "api_base": "https://api.anthropic.com/v1",
         "models": [
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-haiku-20241022",
-            "claude-3-opus-20240229",
-            "claude-3-sonnet-20240229",
-            "claude-3-haiku-20240307",
+            "claude-opus-4-6",
+            "claude-sonnet-4-5",
+            "claude-haiku-4-5",
+            "claude-sonnet-4-20250514",
+            "claude-3-7-sonnet-20250219",
         ],
         "prefix": "anthropic/",
         "requires_api_key": True,
@@ -57,13 +55,7 @@ PROVIDERS = {
     "gemini": {
         "name": "Google Gemini",
         "api_base": "https://generativelanguage.googleapis.com/v1beta",
-        "models": [
-            "gemini-2.0-flash-exp",
-            "gemini-1.5-pro",
-            "gemini-1.5-flash",
-            "gemini-1.5-flash-8b",
-            "gemini-pro",
-        ],
+        "models": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
         "prefix": "gemini/",
         "requires_api_key": True,
         "requires_api_base": False,
@@ -71,94 +63,134 @@ PROVIDERS = {
     },
     "deepseek": {
         "name": "DeepSeek",
-        "api_base": "https://api.deepseek.com/v1",
-        "models": ["deepseek-chat", "deepseek-coder", "deepseek-reasoner"],
-        "prefix": "openai/",
+        "api_base": "https://api.deepseek.com",
+        "models": ["deepseek-v3.2", "deepseek-v3", "deepseek-r1", "deepseek-chat"],
+        "prefix": "deepseek/",
         "requires_api_key": True,
         "requires_api_base": False,
         "requires_api_version": False,
     },
-    "siliconflow": {
-        "name": "SiliconFlow",
-        "api_base": "https://api.siliconflow.cn/v1",
+    "dashscope": {
+        "name": "通义千问 (DashScope)",
+        "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
         "models": [
-            "Pro/zai-org/GLM-4.7",
-            "Pro/zai-org/GLM-5",
-            "Pro/moonshotai/Kimi-K2.5",
+            "qwen3-max",
+            "qwen3-coder-plus",
+            "qwen3-coder-flash",
+            "qwen3.5-plus",
+            "qwen-plus-latest",
+            "qwq-plus",
         ],
-        "prefix": "openai/",
+        "prefix": "dashscope/",
         "requires_api_key": True,
         "requires_api_base": False,
         "requires_api_version": False,
     },
-    "moonshot": {
-        "name": "Moonshot (Kimi)",
+    "minimax": {
+        "name": "MiniMax",
+        "api_base": "https://api.minimax.chat/v1",
+        "models": [
+            "MiniMax-M2.5",
+            "MiniMax-M2.5-lightning",
+            "MiniMax-M2.1",
+            "MiniMax-M2.1-lightning",
+        ],
+        "prefix": "minimax/",
+        "requires_api_key": True,
+        "requires_api_base": False,
+        "requires_api_version": False,
+    },
+    "kimi_moonshot": {
+        "name": "Kimi (Moonshot)",
         "api_base": "https://api.moonshot.cn/v1",
-        "models": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
-        "prefix": "openai/",
+        "models": [
+            "kimi-k2.5",
+            "kimi-latest",
+            "kimi-k2-thinking",
+            "moonshot-v1-auto",
+            "moonshot-v1-128k",
+        ],
+        "prefix": "moonshot/",
+        "requires_api_key": True,
+        "requires_api_base": False,
+        "requires_api_version": False,
+    },
+    "zai": {
+        "name": "智谱 AI (ZAI \u56fd\u9645)",
+        "api_base": "",
+        "models": [
+            "glm-5",
+            "glm-5-code",
+            "glm-4.7",
+            "glm-4.6",
+            "glm-4.5",
+            "glm-4.5-flash",
+        ],
+        "prefix": "zai/",
         "requires_api_key": True,
         "requires_api_base": False,
         "requires_api_version": False,
     },
     "zhipu": {
-        "name": "智谱 AI",
+        "name": "智谱 AI (BigModel \u56fd\u5185)",
         "api_base": "https://open.bigmodel.cn/api/paas/v4",
         "models": [
+            "glm-5",
+            "glm-5-code",
             "glm-4-plus",
-            "glm-4-0520",
-            "glm-4-air",
-            "glm-4-airx",
             "glm-4-flash",
             "glm-4v-plus",
-            "glm-4v",
         ],
-        "prefix": "zhipu/",
+        "prefix": "openai/",
         "requires_api_key": True,
         "requires_api_base": False,
         "requires_api_version": False,
     },
-    "ollama": {
-        "name": "Ollama (本地)",
-        "api_base": "http://localhost:11434/v1",
+    "xai": {
+        "name": "xAI (Grok)",
+        "api_base": "https://api.x.ai/v1",
         "models": [
-            "llama3.2",
-            "llama3.1",
-            "qwen2.5",
-            "deepseek-r1",
-            "mistral",
-            "codellama",
+            "grok-4",
+            "grok-4-latest",
+            "grok-4-1-fast",
+            "grok-3-latest",
+            "grok-3-mini-fast-latest",
         ],
-        "prefix": "ollama/",
-        "requires_api_key": False,
-        "requires_api_base": True,
+        "prefix": "xai/",
+        "requires_api_key": True,
+        "requires_api_base": False,
         "requires_api_version": False,
     },
     "openrouter": {
         "name": "OpenRouter",
         "api_base": "https://openrouter.ai/api/v1",
         "models": [
-            "openai/gpt-4o",
-            "anthropic/claude-3.5-sonnet",
-            "google/gemini-pro-1.5",
-            "meta-llama/llama-3.1-70b-instruct",
-            "deepseek/deepseek-chat",
+            "openai/gpt-4.1",
+            "openai/o3",
+            "anthropic/claude-sonnet-4-5",
+            "google/gemini-2.5-pro",
+            "deepseek/deepseek-v3.2",
+            "x-ai/grok-4",
         ],
         "prefix": "openrouter/",
         "requires_api_key": True,
         "requires_api_base": False,
         "requires_api_version": False,
     },
-    "together": {
-        "name": "Together AI",
-        "api_base": "https://api.together.xyz/v1",
+    "ollama": {
+        "name": "Ollama (\u672c\u5730)",
+        "api_base": "http://localhost:11434/v1",
         "models": [
-            "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-            "mistralai/Mixtral-8x7B-Instruct-v0.1",
-            "Qwen/Qwen2.5-72B-Instruct-Turbo",
+            "qwen3-coder",
+            "deepseek-r1",
+            "llama3.1",
+            "qwen2.5",
+            "mistral",
+            "gemma3",
         ],
-        "prefix": "together_ai/",
-        "requires_api_key": True,
-        "requires_api_base": False,
+        "prefix": "ollama/",
+        "requires_api_key": False,
+        "requires_api_base": True,
         "requires_api_version": False,
     },
     "custom": {
@@ -209,7 +241,7 @@ def get_litellm_model_name(provider_id, model_name):
     return f"{prefix}{model_name}"
 
 
-def create_default_config(name, provider_id="openai"):
+def create_default_config(name, provider_id="siliconflow"):
     """
     创建默认配置
 
@@ -293,8 +325,6 @@ class ConfigManager:
         url_lower = url.lower()
         if "openai.com" in url_lower:
             return "openai"
-        elif "azure" in url_lower:
-            return "azure"
         elif "anthropic.com" in url_lower:
             return "anthropic"
         elif "generativelanguage.googleapis" in url_lower:
@@ -304,15 +334,21 @@ class ConfigManager:
         elif "siliconflow" in url_lower:
             return "siliconflow"
         elif "moonshot" in url_lower:
-            return "moonshot"
-        elif "bigmodel.cn" in url_lower or "zhipu" in url_lower:
+            return "kimi_moonshot"
+        elif "bigmodel.cn" in url_lower:
             return "zhipu"
+        elif "zai.chat" in url_lower or "z.ai" in url_lower:
+            return "zai"
+        elif "dashscope" in url_lower or "aliyuncs" in url_lower:
+            return "dashscope"
+        elif "minimax" in url_lower:
+            return "minimax"
+        elif "x.ai" in url_lower:
+            return "xai"
         elif "localhost:11434" in url_lower or "127.0.0.1:11434" in url_lower:
             return "ollama"
         elif "openrouter.ai" in url_lower:
             return "openrouter"
-        elif "together.xyz" in url_lower:
-            return "together"
         return "custom"
 
     def save(self):
@@ -378,6 +414,15 @@ class ConfigManager:
         """设置语言"""
         self._config["language"] = lang
         _i18n.set_language(lang)
+        return self.save()
+
+    def get_tool_prompts(self):
+        """获取自定义工具提示词"""
+        return self._config.get("tool_prompts", {})
+
+    def set_tool_prompts(self, prompts):
+        """设置自定义工具提示词"""
+        self._config["tool_prompts"] = prompts
         return self.save()
 
     def import_configs(self, filepath):

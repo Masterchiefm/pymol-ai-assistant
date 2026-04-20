@@ -454,7 +454,8 @@ class AIClient:
             request_params["api_version"] = self.api_version
 
         if use_tools:
-            request_params["tools"] = tools.get_tool_definitions(self.is_vision_model)
+            custom_prompts = config.config_manager.get_tool_prompts()
+            request_params["tools"] = tools.get_tool_definitions(self.is_vision_model, custom_prompts)
             request_params["tool_choice"] = "auto"
 
         return request_params
@@ -722,14 +723,30 @@ class AIClient:
                         },
                         ensure_ascii=False,
                     )
-                elif result.get("output"):
-                    tool_response_content = result.get("output")
-                elif result.get("data"):
-                    tool_response_content = json.dumps(
-                        result.get("data"), ensure_ascii=False
-                    )
-                elif not tool_response_content:
-                    tool_response_content = json.dumps(result, ensure_ascii=False)
+                else:
+                    extra_parts = []
+                    if result.get("output"):
+                        extra_parts.append(result["output"])
+                    if result.get("data"):
+                        extra_parts.append(
+                            json.dumps(result["data"], ensure_ascii=False)
+                        )
+                    if result.get("errors"):
+                        extra_parts.append(
+                            "错误: " + "; ".join(result["errors"])
+                        )
+                    if result.get("error"):
+                        extra_parts.append(result["error"])
+                    if extra_parts:
+                        extra = "\n".join(extra_parts)
+                        if tool_response_content:
+                            tool_response_content += "\n" + extra
+                        else:
+                            tool_response_content = extra
+                    elif not tool_response_content:
+                        tool_response_content = json.dumps(
+                            result, ensure_ascii=False
+                        )
 
                 full_messages.append(
                     {

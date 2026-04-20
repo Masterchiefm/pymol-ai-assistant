@@ -872,6 +872,16 @@ class ConfigWidget(QtWidgets.QWidget):
             self.export_btn.setText(i18n._("export_button"))
 
         self.update_provider_combo()
+        if hasattr(self, "register_link_label"):
+            provider_id = self.provider_combo.currentData()
+            if provider_id:
+                provider_info = config.get_provider_info(provider_id)
+                register_link = provider_info.get("register_link", "")
+                if register_link:
+                    link_text = '<a href="{0}" style="color: #5DADE2; text-decoration: none;">{1}</a>'.format(
+                        register_link, i18n._("register_link")
+                    )
+                    self.register_link_label.setText(link_text)
         self.load_configs()
 
     def update_provider_combo(self):
@@ -1017,6 +1027,7 @@ class ConfigWidget(QtWidgets.QWidget):
         self.model_combo = QtWidgets.QComboBox()
         self.model_combo.setEditable(True)
         self.model_combo.setStyleSheet(combo_style)
+        self.model_combo.currentIndexChanged.connect(self.on_model_changed)
         form_layout.addWidget(self.labels["model_label"], row, 0)
         form_layout.addWidget(self.model_combo, row, 1)
 
@@ -1039,7 +1050,16 @@ class ConfigWidget(QtWidgets.QWidget):
         form_layout.addWidget(self.labels["key_label"], row, 0)
         form_layout.addWidget(self.key_edit, row, 1)
 
-        row += 1
+        self.register_link_label = QtWidgets.QLabel("")
+        self.register_link_label.setStyleSheet(
+            "font-size: 11px; color: #5DADE2; padding-left: 2px;"
+        )
+        self.register_link_label.setOpenExternalLinks(True)
+        self.register_link_label.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
+        self.register_link_label.setVisible(False)
+        form_layout.addWidget(self.register_link_label, row + 1, 1)
+
+        row += 2
         self.labels["version_label"] = QtWidgets.QLabel(i18n._("api_version"))
         self.labels["version_label"].setStyleSheet("color: #CCCCCC; font-size: 13px;")
         self.version_edit = QtWidgets.QLineEdit()
@@ -1215,11 +1235,24 @@ class ConfigWidget(QtWidgets.QWidget):
         models = provider_info.get("models", [])
         for model in models:
             self.model_combo.addItem(model)
+        if models:
+            self.model_combo.insertSeparator(self.model_combo.count())
+        self.model_combo.addItem(i18n._("custom_model"))
         self.model_combo.blockSignals(False)
 
         default_url = provider_info.get("api_base", "")
         if default_url:
             self.url_edit.setText(default_url)
+
+        register_link = provider_info.get("register_link", "")
+        if register_link and hasattr(self, "register_link_label"):
+            link_text = '<a href="{0}" style="color: #5DADE2; text-decoration: none;">{1}</a>'.format(
+                register_link, i18n._("register_link")
+            )
+            self.register_link_label.setText(link_text)
+            self.register_link_label.setVisible(True)
+        elif hasattr(self, "register_link_label"):
+            self.register_link_label.setVisible(False)
 
         requires_key = provider_info.get("requires_api_key", True)
         requires_base = provider_info.get("requires_api_base", False)
@@ -1235,6 +1268,11 @@ class ConfigWidget(QtWidgets.QWidget):
         self.version_edit.setEnabled(requires_version)
         self.version_edit.setVisible(requires_version)
         self.labels["version_label"].setVisible(requires_version)
+
+    def on_model_changed(self, index):
+        if self.model_combo.currentText() == i18n._("custom_model"):
+            self.model_combo.setEditText("")
+            self.model_combo.setFocus()
 
     def load_configs(self):
         self.config_list.clear()
@@ -1291,10 +1329,8 @@ class ConfigWidget(QtWidgets.QWidget):
     def clear_form(self):
         self.current_config_name = None
         self.name_edit.clear()
-        self.provider_combo.setCurrentIndex(0)
         self.url_edit.clear()
         self.key_edit.clear()
-        self.model_combo.setEditText("")
         self.version_edit.clear()
         self.reasoning_checkbox.setChecked(False)
         self.vision_checkbox.setChecked(False)
@@ -1302,6 +1338,7 @@ class ConfigWidget(QtWidgets.QWidget):
         self.temp_spin.setValue(0.7)
         self.max_tokens_spin.setValue(8000)
         self.timeout_spin.setValue(60)
+        self.provider_combo.setCurrentIndex(0)
 
     def on_new(self):
         self.clear_form()
@@ -1317,7 +1354,7 @@ class ConfigWidget(QtWidgets.QWidget):
         if not name:
             self.show_warning(i18n._("name_required"))
             return
-        if not model:
+        if not model or model == i18n._("custom_model"):
             self.show_warning(i18n._("model_required"))
             return
 
@@ -1376,7 +1413,7 @@ class ConfigWidget(QtWidgets.QWidget):
         key = self.key_edit.text().strip()
         model = self.model_combo.currentText().strip()
 
-        if not model:
+        if not model or model == i18n._("custom_model"):
             self.show_warning(i18n._("error_no_config"))
             return
 
@@ -1426,6 +1463,121 @@ class ConfigWidget(QtWidgets.QWidget):
 
     def show_error(self, msg):
         QtWidgets.QMessageBox.critical(self, "Error", msg)
+
+
+class PromptConfigWidget(QtWidgets.QWidget):
+    """提示词配置标签页"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_ui()
+
+    def update_language(self):
+        if hasattr(self, "do_cmd_label"):
+            self.do_cmd_label.setText(i18n._("prompt_pymol_do_command"))
+        if hasattr(self, "write_script_label"):
+            self.write_script_label.setText(i18n._("prompt_pymol_write_script"))
+        if hasattr(self, "save_btn"):
+            self.save_btn.setText(i18n._("save_prompts"))
+        if hasattr(self, "reset_btn"):
+            self.reset_btn.setText(i18n._("reset_prompts"))
+
+    def setup_ui(self):
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
+
+        panel = QtWidgets.QFrame()
+        panel.setStyleSheet("""
+            QFrame {
+                background-color: #404040;
+                border-radius: 15px;
+                border: none;
+            }
+        """)
+        panel_layout = QtWidgets.QVBoxLayout(panel)
+        panel_layout.setContentsMargins(25, 20, 25, 20)
+        panel_layout.setSpacing(12)
+
+        from . import tools
+
+        custom_prompts = config.config_manager.get_tool_prompts()
+
+        self.do_cmd_label = QtWidgets.QLabel(i18n._("prompt_pymol_do_command"))
+        self.do_cmd_label.setStyleSheet("color: #CCCCCC; font-size: 14px;")
+        panel_layout.addWidget(self.do_cmd_label)
+
+        self.do_cmd_edit = QtWidgets.QTextEdit()
+        self.do_cmd_edit.setPlainText(
+            custom_prompts.get("pymol_do_command", tools.DEFAULT_PYMOL_DO_COMMAND_DESCRIPTION)
+        )
+        self.do_cmd_edit.setStyleSheet("""
+            QTextEdit {
+                background-color: #4A4A4A;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-family: Consolas, Monaco, monospace;
+                font-size: 13px;
+            }
+            QTextEdit:focus {
+                border: 2px solid #5DADE2;
+            }
+        """)
+        self.do_cmd_edit.setMinimumHeight(200)
+        panel_layout.addWidget(self.do_cmd_edit)
+
+        self.write_script_label = QtWidgets.QLabel(i18n._("prompt_pymol_write_script"))
+        self.write_script_label.setStyleSheet("color: #CCCCCC; font-size: 14px;")
+        panel_layout.addWidget(self.write_script_label)
+
+        self.write_script_edit = QtWidgets.QTextEdit()
+        self.write_script_edit.setPlainText(
+            custom_prompts.get("pymol_write_script", tools.DEFAULT_PYMOL_WRITE_SCRIPT_DESCRIPTION)
+        )
+        self.write_script_edit.setStyleSheet(self.do_cmd_edit.styleSheet())
+        self.write_script_edit.setMinimumHeight(200)
+        panel_layout.addWidget(self.write_script_edit)
+
+        btn_layout = QtWidgets.QHBoxLayout()
+        btn_layout.setSpacing(8)
+
+        self.reset_btn = StyledButton(i18n._("reset_prompts"))
+        self.reset_btn.clicked.connect(self.on_reset)
+        btn_layout.addWidget(self.reset_btn)
+
+        btn_layout.addStretch()
+
+        self.save_btn = StyledButton(i18n._("save_prompts"), accent=True)
+        self.save_btn.clicked.connect(self.on_save)
+        btn_layout.addWidget(self.save_btn)
+
+        panel_layout.addLayout(btn_layout)
+
+        main_layout.addWidget(panel)
+        main_layout.addStretch()
+
+    def on_save(self):
+        prompts = {
+            "pymol_do_command": self.do_cmd_edit.toPlainText(),
+            "pymol_write_script": self.write_script_edit.toPlainText(),
+        }
+        config.config_manager.set_tool_prompts(prompts)
+        QtWidgets.QMessageBox.information(
+            self, i18n._("save_prompts"), i18n._("prompts_saved")
+        )
+
+    def on_reset(self):
+        from . import tools
+
+        defaults = tools.get_default_tool_prompts()
+        self.do_cmd_edit.setPlainText(defaults["pymol_do_command"])
+        self.write_script_edit.setPlainText(defaults["pymol_write_script"])
+        config.config_manager.set_tool_prompts({})
+        QtWidgets.QMessageBox.information(
+            self, i18n._("reset_prompts"), i18n._("prompts_reset")
+        )
 
 
 class LogWidget(QtWidgets.QWidget):
@@ -1919,6 +2071,10 @@ class AIAssistantDialog(QtWidgets.QDialog):
         self.config_widget.config_changed.connect(self.on_config_changed)
         self.tabs.addTab(self.config_widget, i18n._("tab_config"))
 
+        # 提示词配置标签页
+        self.prompt_config_widget = PromptConfigWidget()
+        self.tabs.addTab(self.prompt_config_widget, i18n._("tab_prompt"))
+
         # 日志标签页
         self.log_widget = LogWidget()
         self.tabs.addTab(self.log_widget, i18n._("tab_log"))
@@ -2297,7 +2453,8 @@ class AIAssistantDialog(QtWidgets.QDialog):
         # 更新标签页标题
         self.tabs.setTabText(0, i18n._("tab_chat"))
         self.tabs.setTabText(1, i18n._("tab_config"))
-        self.tabs.setTabText(2, i18n._("tab_log"))
+        self.tabs.setTabText(2, i18n._("tab_prompt"))
+        self.tabs.setTabText(3, i18n._("tab_log"))
 
         # 更新聊天组件
         self.chat_widget.input_text.setPlaceholderText(i18n._("input_placeholder"))
@@ -2321,8 +2478,9 @@ class AIAssistantDialog(QtWidgets.QDialog):
             }.get(role, role)
             widget.role_label.setText("<b>%s:</b>" % role_text)
 
-        # 更新配置和日志界面
+        # 更新配置、提示词和日志界面
         self.config_widget.update_language()
+        self.prompt_config_widget.update_language()
         self.log_widget.update_language()
 
     def show_about_dialog(self):
