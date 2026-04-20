@@ -912,7 +912,30 @@ class ConfigWidget(QtWidgets.QWidget):
     def setup_ui(self):
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
+
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("""
+            QScrollArea { background: transparent; border: none; }
+            QScrollBar:vertical {
+                background: #2D2D2D;
+                width: 8px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical {
+                background: #666666;
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+
+        container = QtWidgets.QWidget()
+        container_layout = QtWidgets.QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(15)
 
         panel = QtWidgets.QFrame()
         panel.setStyleSheet("""
@@ -1220,7 +1243,7 @@ class ConfigWidget(QtWidgets.QWidget):
         io_layout.addStretch()
         panel_layout.addLayout(io_layout)
 
-        main_layout.addWidget(panel)
+        container_layout.addWidget(panel)
 
         self.prompt_toggle = QtWidgets.QPushButton("📝 " + i18n._("prompt_config_title"))
         self.prompt_toggle.setStyleSheet("""
@@ -1237,7 +1260,7 @@ class ConfigWidget(QtWidgets.QWidget):
             }
         """)
         self.prompt_toggle.clicked.connect(self.toggle_prompt_section)
-        main_layout.addWidget(self.prompt_toggle)
+        container_layout.addWidget(self.prompt_toggle)
 
         self.prompt_frame = QtWidgets.QFrame()
         self.prompt_frame.setStyleSheet("""
@@ -1313,9 +1336,11 @@ class ConfigWidget(QtWidgets.QWidget):
 
         prompt_layout.addLayout(prompt_btn_layout)
         self.prompt_frame.hide()
-        main_layout.addWidget(self.prompt_frame)
+        container_layout.addWidget(self.prompt_frame)
 
-        main_layout.addStretch()
+        container_layout.addStretch()
+        self.scroll_area.setWidget(container)
+        main_layout.addWidget(self.scroll_area)
 
         self.on_provider_changed(0)
 
