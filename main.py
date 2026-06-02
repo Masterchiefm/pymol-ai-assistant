@@ -2355,12 +2355,9 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
     def install_update(self, dialog):
         """安装更新"""
-        from pymol.Qt.QtWidgets import QMessageBox
-        from pymol.Qt.QtCore import Qt
-        try:
-            from PyQt5.QtWidgets import QProgressDialog
-        except ImportError:
-            from pymol.Qt.QtWidgets import QProgressDialog
+        QMessageBox = QtWidgets.QMessageBox
+        Qt = QtCore.Qt
+        QProgressDialog = QtWidgets.QProgressDialog
         import os
 
         is_en = i18n.get_language() == "en"
