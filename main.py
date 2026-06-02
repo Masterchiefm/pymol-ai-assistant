@@ -6,6 +6,7 @@
 import os
 import sys
 import json
+import base64
 from datetime import datetime
 
 from pymol.Qt import QtCore, QtWidgets, QtGui
@@ -609,7 +610,7 @@ class ChatWidget(QtWidgets.QWidget):
                 ):
                     self.on_send_clicked()
                     return True
-            elif event_type == 6:
+            elif event_type == QtCore.QEvent.Type.DragEnter:
                 mime_data = event.mimeData()
                 if mime_data.hasImage():
                     self.handle_pasted_image(mime_data.imageData())
@@ -660,7 +661,6 @@ class ChatWidget(QtWidgets.QWidget):
         )
 
         # 保存原始图片数据（使用原图，不要用预览图）
-        import base64
 
         buffer = QtCore.QBuffer()
         buffer.open(QtCore.QIODevice.WriteOnly)
@@ -1562,7 +1562,7 @@ class ConfigWidget(QtWidgets.QWidget):
             self.load_configs()
             self.config_changed.emit()
         else:
-            self.show_error("Failed to save configuration")
+            self.show_error(i18n._("config_save_failed"))
 
     def on_delete(self):
         name = self.name_edit.text().strip()
@@ -1616,11 +1616,11 @@ class ConfigWidget(QtWidgets.QWidget):
         )
         if filename:
             if config.config_manager.import_configs(filename):
-                self.show_info("Configurations imported successfully")
+                self.show_info(i18n._("config_import_success"))
                 self.load_configs()
                 self.config_changed.emit()
             else:
-                self.show_error("Failed to import configurations")
+                self.show_error(i18n._("config_import_failed"))
 
     def on_export(self):
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(
@@ -1628,9 +1628,9 @@ class ConfigWidget(QtWidgets.QWidget):
         )
         if filename:
             if config.config_manager.export_configs(filename):
-                self.show_info("Configurations exported successfully")
+                self.show_info(i18n._("config_export_success"))
             else:
-                self.show_error("Failed to export configurations")
+                self.show_error(i18n._("config_export_failed"))
 
     def show_info(self, msg):
         QtWidgets.QMessageBox.information(self, "Success", msg)
@@ -1810,7 +1810,7 @@ class LogWidget(QtWidgets.QWidget):
                     '<br><span style="color: #888888; margin-left: 20px; font-size: 11px;">%s</span>'
                     % data_str.replace("\n", "<br>")
                 )
-            except:
+            except Exception:
                 pass
 
         log_line += "<br>"
@@ -1837,11 +1837,8 @@ class LogWidget(QtWidgets.QWidget):
         logger.logger.clear()
         self.log_text.clear()
 
-    def __del__(self):
-        try:
-            logger.logger.remove_observer(self.on_log_entry)
-        except:
-            pass
+    def cleanup(self):
+        logger.logger.remove_observer(self.on_log_entry)
 
 
 class AboutDialog(QtWidgets.QDialog):
@@ -2079,6 +2076,12 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
         self.setup_ui()
         self.init_ai_client()
+
+    def closeEvent(self, event):
+        i18n.remove_language_change_callback(self._on_language_changed)
+        if hasattr(self, 'log_widget'):
+            self.log_widget.cleanup()
+        super().closeEvent(event)
 
     def setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
@@ -2352,8 +2355,12 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
     def install_update(self, dialog):
         """安装更新"""
-        from PyQt5.QtWidgets import QMessageBox, QProgressDialog
-        from PyQt5.QtCore import Qt
+        from pymol.Qt.QtWidgets import QMessageBox
+        from pymol.Qt.QtCore import Qt
+        try:
+            from PyQt5.QtWidgets import QProgressDialog
+        except ImportError:
+            from pymol.Qt.QtWidgets import QProgressDialog
         import os
 
         is_en = i18n.get_language() == "en"
@@ -2394,20 +2401,17 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
     def on_download_finished(self, dialog, progress, success, error, temp_file, is_en):
         """下载完成处理 - 在主线程中执行安装"""
-        from PyQt5.QtWidgets import QMessageBox
 
         if success and temp_file:
-            # 下载成功，开始安装
-            progress.setLabelText("Installing plugin..." if is_en else "安装插件中...")
+            progress.setLabelText(i18n._("installing_plugin"))
             progress.setValue(90)
 
             try:
-                # 在主线程中安装插件
-                sys.path.insert(
-                    0,
-                    r"C:\Users\moqiq\PycharmProjects\pymol-open-source-master\modules",
-                )
-                from pymol.plugins.installation import installPluginFromFile
+                try:
+                    from pymol.plugins.installation import installPluginFromFile
+                except ImportError:
+                    from pymol import plugins
+                    installPluginFromFile = plugins.installation.installPluginFromFile
 
                 installPluginFromFile(temp_file)
 
@@ -2416,10 +2420,8 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
                 QMessageBox.information(
                     dialog,
-                    "Success" if is_en else "安装成功",
-                    "Update installed successfully!\n\nPlease restart PyMOL to use the new version."
-                    if is_en
-                    else "更新安装成功！\n\n请重启PyMOL以使用新版本。",
+                    i18n._("success"),
+                    i18n._("install_success"),
                 )
                 dialog.accept()
 
@@ -2427,10 +2429,8 @@ class AIAssistantDialog(QtWidgets.QDialog):
                 progress.close()
                 QMessageBox.critical(
                     dialog,
-                    "Error" if is_en else "错误",
-                    f"Failed to install plugin: {str(e)}"
-                    if is_en
-                    else f"安装插件失败: {str(e)}",
+                    i18n._("error"),
+                    i18n._("install_failed", str(e)),
                 )
 
         else:
@@ -2583,7 +2583,7 @@ class AIAssistantDialog(QtWidgets.QDialog):
             QtWidgets.QMessageBox.warning(
                 self,
                 i18n._("error_no_config"),
-                "当前配置未启用视觉模型功能，请在配置页勾选'视觉模型'选项",
+                i18n._("vision_not_enabled"),
             )
             return
 
@@ -2615,8 +2615,6 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
                 if text:
                     content_list.append({"type": "text", "text": text})
-
-                import base64
 
                 for img_data in images:
                     img_bytes = img_data.get("data")
@@ -2708,9 +2706,6 @@ class AIAssistantDialog(QtWidgets.QDialog):
             and result.get("success")
             and result.get("image_data")
         ):
-            import base64
-            from pymol.Qt import QtGui
-
             image_data = result.get("image_data")
             img_bytes = base64.b64decode(image_data)
             pixmap = QtGui.QPixmap()
@@ -2834,4 +2829,3 @@ class AIStreamWorker(QtCore.QThread):
 
     def terminate(self):
         self._is_running = False
-        super().terminate()

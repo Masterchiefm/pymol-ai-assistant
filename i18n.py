@@ -125,6 +125,23 @@ TRANSLATIONS = {
         "reset_prompts": "恢复默认",
         "prompts_saved": "提示词已保存！",
         "prompts_reset": "提示词已恢复为默认值",
+        "vision_not_enabled": "当前配置未启用视觉模型功能，请在配置页勾选'视觉模型'选项",
+        "key_required": "API Key 不能为空！",
+        "update_title": "更新",
+        "config_import_success": "配置导入成功！",
+        "config_import_failed": "配置导入失败",
+        "config_export_success": "配置导出成功！",
+        "config_export_failed": "配置导出失败",
+        "config_save_failed": "配置保存失败",
+        "installing_plugin": "安装插件中...",
+        "install_success": "更新安装成功！\n\n请重启PyMOL以使用新版本。",
+        "install_failed": "安装插件失败: {}",
+        "download_timeout": "下载超时。请从以下发布页面手动下载：",
+        "download_failed": "下载失败",
+        "confirm": "确认",
+        "success": "成功",
+        "error": "错误",
+        "warning": "警告",
     },
     "en": {
         "window_title": "PyMOL AI Assistant",
@@ -241,6 +258,23 @@ TRANSLATIONS = {
         "reset_prompts": "Reset to Default",
         "prompts_saved": "Prompts saved!",
         "prompts_reset": "Prompts have been reset to default values",
+        "vision_not_enabled": "Vision model is not enabled. Please check 'Vision Model' in Config tab.",
+        "key_required": "API Key is required!",
+        "update_title": "Update",
+        "config_import_success": "Configurations imported successfully!",
+        "config_import_failed": "Failed to import configurations",
+        "config_export_success": "Configurations exported successfully!",
+        "config_export_failed": "Failed to export configurations",
+        "config_save_failed": "Failed to save configuration",
+        "installing_plugin": "Installing plugin...",
+        "install_success": "Update installed successfully!\n\nPlease restart PyMOL to use the new version.",
+        "install_failed": "Failed to install plugin: {}",
+        "download_timeout": "Download timeout. Please download manually from the release page:",
+        "download_failed": "Download Failed",
+        "confirm": "Confirm",
+        "success": "Success",
+        "error": "Error",
+        "warning": "Warning",
     },
 }
 
@@ -280,6 +314,6 @@ def _(key, *args):
     if args:
         try:
             text = text.format(*args)
-        except:
+        except (IndexError, KeyError, ValueError):
             pass
     return text

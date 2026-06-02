@@ -3,10 +3,14 @@
 独立更新模块 - 只在工作线程中下载，安装在主线程中执行
 """
 
+import os
 import sys
 import tempfile
 import requests
-from PyQt5.QtCore import QThread, pyqtSignal, QObject
+try:
+    from pymol.Qt.QtCore import QThread, pyqtSignal
+except ImportError:
+    from PyQt5.QtCore import QThread, pyqtSignal
 
 
 class DownloadThread(QThread):
@@ -78,7 +82,8 @@ class DownloadThread(QThread):
             
         except requests.Timeout:
             return False, None
-        except Exception:
+        except Exception as e:
+            print("[PyMOL AI Assistant] Gitee下载失败: {}".format(e))
             return False, None
     
     def _try_github_download(self):
@@ -106,7 +111,8 @@ class DownloadThread(QThread):
             
         except requests.Timeout:
             return False, None
-        except Exception:
+        except Exception as e:
+            print("[PyMOL AI Assistant] GitHub下载失败: {}".format(e))
             return False, None
     
     def _download_file(self, url, timeout):
@@ -124,6 +130,10 @@ class DownloadThread(QThread):
                 for chunk in response.iter_content(chunk_size=8192):
                     if self._should_stop:
                         temp_file.close()
+                        try:
+                            os.unlink(temp_file.name)
+                        except Exception:
+                            pass
                         return False, None
                     
                     if chunk:
@@ -136,5 +146,11 @@ class DownloadThread(QThread):
             
             return True, temp_file.name
             
-        except Exception:
+        except Exception as e:
+            print("[PyMOL AI Assistant] 文件下载失败: {}".format(e))
+            try:
+                if temp_file and os.path.exists(temp_file.name):
+                    os.unlink(temp_file.name)
+            except Exception:
+                pass
             return False, None

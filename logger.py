@@ -31,7 +31,7 @@ class Logger:
     """日志管理器"""
 
     _instance = None
-    _max_entries = None  # 不限制日志条目数
+    _max_entries = 1000
 
     def __new__(cls):
         if cls._instance is None:
@@ -63,7 +63,7 @@ class Logger:
         for callback in self._observers:
             try:
                 callback(entry)
-            except:
+            except Exception:
                 pass
 
     def load(self):
@@ -135,13 +135,15 @@ class Logger:
                 # 尝试序列化，如果失败则转为字符串
                 json.dumps(processed_data)
                 entry["data"] = processed_data
-            except:
+            except (TypeError, ValueError):
                 entry["data"] = str(data)
 
         self._logs.append(entry)
+        if self._max_entries and len(self._logs) > self._max_entries:
+            self._logs = self._logs[-self._max_entries:]
 
-        # 通知观察者
         self._notify_observers(entry)
+        self.save()
 
         return entry
 
@@ -194,7 +196,3 @@ class Logger:
 
 # 全局日志实例
 logger = Logger()
-
-# 确保SYSTEM常量存在
-if "SYSTEM" not in dir():
-    SYSTEM = "SYSTEM"

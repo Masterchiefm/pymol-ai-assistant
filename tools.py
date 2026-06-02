@@ -12,6 +12,7 @@ import json
 import traceback
 import sys
 import tempfile
+import base64
 from typing import Dict, List, Any, Optional, Callable
 from io import StringIO
 from . import logger
@@ -194,6 +195,22 @@ def get_default_tool_prompts():
         "pymol_write_script": DEFAULT_PYMOL_WRITE_SCRIPT_DESCRIPTION,
     }
 
+
+
+VALID_PYMOL_COLORS = frozenset([
+    "red", "green", "blue", "yellow", "cyan", "magenta", "white", "black",
+    "tv_red", "raspberry", "darksalmon", "salmon", "deepsalmon", "warmpink",
+    "firebrick", "ruby", "chocolate", "brown", "tv_green", "chartreuse",
+    "splitpea", "smudge", "palegreen", "limegreen", "lime", "limon", "forest",
+    "tv_blue", "marine", "slate", "lightblue", "skyblue", "purpleblue",
+    "deepblue", "density", "tv_yellow", "paleyellow", "yelloworange", "wheat",
+    "sand", "lightmagenta", "hotpink", "pink", "lightpink", "dirtyviolet",
+    "violet", "violetpurple", "purple", "deeppurple", "palecyan", "aquamarine",
+    "greencyan", "teal", "deepteal", "lightteal", "tv_orange", "brightorange",
+    "lightorange", "olive", "deepolive", "gray", "grey", "gray90", "gray80",
+    "gray70", "gray60", "gray50", "gray40", "gray30", "gray20", "gray10",
+    "orange", "atomic", "auto", "default", "current",
+])
 
 def get_tool_definitions(is_vision_model: bool = False, custom_prompts: Dict[str, str] = None) -> List[Dict[str, Any]]:
     """
@@ -973,6 +990,20 @@ class ToolExecutor:
 
         return command
 
+    @staticmethod
+    def _has_error(feedback_text, extra_patterns=None):
+        patterns = ["Error:", "error:", "ERROR:"]
+        if extra_patterns:
+            patterns.extend(extra_patterns)
+        return any(p in feedback_text for p in patterns)
+
+    def _exec_and_capture(self, pymol_cmd, func, *args, **kwargs):
+        pymol_cmd._get_feedback()
+        result = func(*args, **kwargs)
+        feedback = pymol_cmd._get_feedback()
+        feedback_text = "\n".join(feedback) if feedback else ""
+        return result, feedback_text
+
     def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行指定的 PyMOL 工具
@@ -1031,13 +1062,13 @@ class ToolExecutor:
 
             return {"success": False, "message": error_msg, "error": tb}
 
-    def _execute_tool(
-        self, cmd, tool_name: str, arguments: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """实际执行工具的辅助方法"""
-        import tempfile, os, sys
-
-        if tool_name == "pymol_fetch":
+    def _execute_tool(self, cmd, tool_name, arguments):
+        method_name = _TOOL_METHOD_MAP.get(tool_name)
+        if method_name is None:
+            return {"success": False, "message": "未知工具: {}".format(tool_name)}
+        handler = getattr(self, method_name)
+        return handler(cmd, arguments)
+    def _tool_pymol_fetch(self, cmd, arguments):
             code = arguments.get("code", "")
             name = arguments.get("name", "")
             if not name:
@@ -1053,8 +1084,7 @@ class ToolExecutor:
             feedback = cmd._get_feedback()
             feedback_text = "\n".join(feedback) if feedback else ""
 
-            error_patterns = ["Error:", "error:", "ERROR:", "failed", "Failed"]
-            has_error = any(pattern in feedback_text for pattern in error_patterns)
+            has_error = self._has_error(feedback_text)
 
             if has_error:
                 return {
@@ -1069,7 +1099,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_load":
+    def _tool_pymol_load(self, cmd, arguments):
             filename = arguments.get("filename", "")
             name = arguments.get("name", "")
             format = arguments.get("format", "")
@@ -1091,8 +1121,7 @@ class ToolExecutor:
                 feedback = cmd._get_feedback()
                 feedback_text = "\n".join(feedback) if feedback else ""
 
-                error_patterns = ["Error:", "error:", "ERROR:", "failed", "Failed"]
-                has_error = any(pattern in feedback_text for pattern in error_patterns)
+                has_error = self._has_error(feedback_text)
 
                 if has_error:
                     return {
@@ -1115,7 +1144,7 @@ class ToolExecutor:
                     "output": feedback_text if feedback_text else str(e),
                 }
 
-        elif tool_name == "pymol_write_script":
+    def _tool_pymol_write_script(self, cmd, arguments):
             code = arguments.get("code", "")
             name = arguments.get("name", "")
             script_type = arguments.get("script_type", "python")
@@ -1157,7 +1186,7 @@ class ToolExecutor:
             except Exception as e:
                 return {"success": False, "message": f"创建脚本失败: {str(e)}"}
 
-        elif tool_name == "pymol_run_script":
+    def _tool_pymol_run_script(self, cmd, arguments):
             filename = arguments.get("filename", "")
             namespace = arguments.get("namespace", "global")
 
@@ -1276,7 +1305,7 @@ class ToolExecutor:
                     "error": tb,
                 }
 
-        elif tool_name == "pymol_do_command":
+    def _tool_pymol_do_command(self, cmd, arguments):
             commands = arguments.get("commands", [])
 
             if isinstance(commands, str):
@@ -1347,17 +1376,7 @@ class ToolExecutor:
                     output_parts.append(stderr_text)
                 combined = "\n".join(output_parts)
 
-                error_patterns = [
-                    "Error:",
-                    "error:",
-                    "ERROR:",
-                    "Traceback",
-                    "Exception",
-                    "Warning:",
-                ]
-                has_error_in_output = any(
-                    pattern in combined for pattern in error_patterns
-                )
+                has_error_in_output = self._has_error(combined, ['Traceback', 'Exception', 'Warning:'])
 
                 if has_error_in_output:
                     has_error = True
@@ -1410,7 +1429,7 @@ class ToolExecutor:
                     "output": combined_output,
                 }
 
-        elif tool_name == "pymol_get_info":
+    def _tool_pymol_get_info(self, cmd, arguments):
             selection = arguments.get("selection", "all")
 
             atom_count = cmd.count_atoms(selection)
@@ -1418,7 +1437,7 @@ class ToolExecutor:
 
             try:
                 chains = cmd.get_chains(selection) or []
-            except:
+            except Exception:
                 chains = []
 
             info = {
@@ -1434,7 +1453,7 @@ class ToolExecutor:
                 "data": info,
             }
 
-        elif tool_name == "pymol_get_selection_details":
+    def _tool_pymol_get_selection_details(self, cmd, arguments):
             selection = arguments.get("selection", "sele")
             include_atoms = arguments.get("include_atoms", False)
 
@@ -1536,7 +1555,7 @@ class ToolExecutor:
 
             return {"success": True, "message": message, "data": result}
 
-        elif tool_name == "pymol_get_atom_info":
+    def _tool_pymol_get_atom_info(self, cmd, arguments):
             selection = arguments.get("selection", "sele")
 
             atom_count = cmd.count_atoms(selection)
@@ -1592,7 +1611,7 @@ class ToolExecutor:
                 },
             }
 
-        elif tool_name == "pymol_get_residue_info":
+    def _tool_pymol_get_residue_info(self, cmd, arguments):
             selection = arguments.get("selection", "sele")
 
             residues = {}
@@ -1642,12 +1661,12 @@ class ToolExecutor:
                 },
             }
 
-        elif tool_name == "pymol_get_chain_info":
+    def _tool_pymol_get_chain_info(self, cmd, arguments):
             selection = arguments.get("selection", "all")
 
             try:
                 chains = cmd.get_chains(selection) or []
-            except:
+            except Exception:
                 chains = []
 
             chain_info = []
@@ -1679,7 +1698,7 @@ class ToolExecutor:
                         resi_max = resi_list[-1]
                     else:
                         resi_min = resi_max = ""
-                except:
+                except Exception:
                     resi_min = resi_max = ""
 
                 chain_info.append(
@@ -1699,7 +1718,7 @@ class ToolExecutor:
                 "data": {"chain_count": len(chain_info), "chains": chain_info},
             }
 
-        elif tool_name == "pymol_get_object_info":
+    def _tool_pymol_get_object_info(self, cmd, arguments):
             object_name = arguments.get("object_name", "")
 
             if object_name:
@@ -1716,7 +1735,7 @@ class ToolExecutor:
                 # 获取链信息
                 try:
                     chains = cmd.get_chains(obj) or []
-                except:
+                except Exception:
                     chains = []
 
                 # 获取残基数
@@ -1731,7 +1750,7 @@ class ToolExecutor:
                         "collect_res(resi, resn, chain)",
                         space={"collect_res": collect_res},
                     )
-                except:
+                except Exception:
                     pass
 
                 object_info.append(
@@ -1750,7 +1769,7 @@ class ToolExecutor:
                 "data": {"object_count": len(object_info), "objects": object_info},
             }
 
-        elif tool_name == "pymol_get_distance":
+    def _tool_pymol_get_distance(self, cmd, arguments):
             selection1 = arguments.get("selection1", "")
             selection2 = arguments.get("selection2", "")
 
@@ -1782,7 +1801,7 @@ class ToolExecutor:
             except Exception as e:
                 return {"success": False, "message": f"计算距离失败: {str(e)}"}
 
-        elif tool_name == "pymol_get_angle":
+    def _tool_pymol_get_angle(self, cmd, arguments):
             selection1 = arguments.get("selection1", "")
             selection2 = arguments.get("selection2", "")
             selection3 = arguments.get("selection3", "")
@@ -1802,7 +1821,7 @@ class ToolExecutor:
             except Exception as e:
                 return {"success": False, "message": f"计算角度失败: {str(e)}"}
 
-        elif tool_name == "pymol_get_dihedral":
+    def _tool_pymol_get_dihedral(self, cmd, arguments):
             selection1 = arguments.get("selection1", "")
             selection2 = arguments.get("selection2", "")
             selection3 = arguments.get("selection3", "")
@@ -1826,7 +1845,7 @@ class ToolExecutor:
             except Exception as e:
                 return {"success": False, "message": f"计算二面角失败: {str(e)}"}
 
-        elif tool_name == "pymol_find_contacts":
+    def _tool_pymol_find_contacts(self, cmd, arguments):
             selection1 = arguments.get("selection1", "")
             selection2 = arguments.get("selection2", "")
             cutoff = arguments.get("cutoff", 4.0)
@@ -1859,7 +1878,7 @@ class ToolExecutor:
             except Exception as e:
                 return {"success": False, "message": f"查找接触失败: {str(e)}"}
 
-        elif tool_name == "pymol_show":
+    def _tool_pymol_show(self, cmd, arguments):
             representation = arguments.get("representation", "")
             selection = arguments.get("selection", "all")
             cmd._get_feedback()
@@ -1872,7 +1891,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_hide":
+    def _tool_pymol_hide(self, cmd, arguments):
             representation = arguments.get("representation", "everything")
             selection = arguments.get("selection", "all")
             cmd._get_feedback()
@@ -1885,7 +1904,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_color":
+    def _tool_pymol_color(self, cmd, arguments):
             color = arguments.get("color", "").strip().lower()
             selection = arguments.get("selection", "all")
 
@@ -1915,106 +1934,13 @@ class ToolExecutor:
                     cmd.spectrum("b", "blue_red", selection)
 
                 else:
-                    valid_colors = [
-                        "red",
-                        "green",
-                        "blue",
-                        "yellow",
-                        "cyan",
-                        "magenta",
-                        "white",
-                        "black",
-                        "tv_red",
-                        "raspberry",
-                        "darksalmon",
-                        "salmon",
-                        "deepsalmon",
-                        "warmpink",
-                        "firebrick",
-                        "ruby",
-                        "chocolate",
-                        "brown",
-                        "tv_green",
-                        "chartreuse",
-                        "splitpea",
-                        "smudge",
-                        "palegreen",
-                        "limegreen",
-                        "lime",
-                        "limon",
-                        "forest",
-                        "tv_blue",
-                        "marine",
-                        "slate",
-                        "lightblue",
-                        "skyblue",
-                        "purpleblue",
-                        "deepblue",
-                        "density",
-                        "tv_yellow",
-                        "paleyellow",
-                        "yelloworange",
-                        "wheat",
-                        "sand",
-                        "lightmagenta",
-                        "hotpink",
-                        "pink",
-                        "lightpink",
-                        "dirtyviolet",
-                        "violet",
-                        "violetpurple",
-                        "purple",
-                        "deeppurple",
-                        "palecyan",
-                        "aquamarine",
-                        "greencyan",
-                        "teal",
-                        "deepteal",
-                        "lightteal",
-                        "tv_orange",
-                        "brightorange",
-                        "lightorange",
-                        "olive",
-                        "deepolive",
-                        "gray",
-                        "grey",
-                        "gray90",
-                        "gray80",
-                        "gray70",
-                        "gray60",
-                        "gray50",
-                        "gray40",
-                        "gray30",
-                        "gray20",
-                        "gray10",
-                        "orange",
-                        "pink",
-                        "violet",
-                        "brown",
-                        "wheat",
-                        "slate",
-                        "salmon",
-                        "atomic",
-                        "auto",
-                        "default",
-                        "current",
-                    ]
-
-                    if color not in valid_colors:
-                        color_aliases = {
-                            "gray": "grey",
-                            "grey": "gray",
-                        }
-                        if color in color_aliases:
-                            color = color_aliases[color]
 
                     cmd.color(color, selection)
 
                 feedback = cmd._get_feedback()
                 feedback_text = "\n".join(feedback) if feedback else ""
 
-                error_patterns = ["Error:", "error:", "ERROR:", "Unknown color"]
-                has_error = any(pattern in feedback_text for pattern in error_patterns)
+                has_error = self._has_error(feedback_text)
 
                 if has_error:
                     return {
@@ -2038,7 +1964,7 @@ class ToolExecutor:
                     "output": feedback_text if feedback_text else str(e),
                 }
 
-        elif tool_name == "pymol_bg_color":
+    def _tool_pymol_bg_color(self, cmd, arguments):
             color = arguments.get("color", "") or "black"
             cmd._get_feedback()
             cmd.bg_color(color)
@@ -2050,7 +1976,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_zoom":
+    def _tool_pymol_zoom(self, cmd, arguments):
             selection = arguments.get("selection", "all")
             buffer = arguments.get("buffer", 0)
             cmd._get_feedback()
@@ -2063,7 +1989,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_rotate":
+    def _tool_pymol_rotate(self, cmd, arguments):
             axis = arguments.get("axis", "")
             angle = arguments.get("angle", 90)
             selection = arguments.get("selection", "")
@@ -2082,7 +2008,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_select":
+    def _tool_pymol_select(self, cmd, arguments):
             name = arguments.get("name", "")
             selection = arguments.get("selection", "")
             cmd._get_feedback()
@@ -2096,7 +2022,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_label":
+    def _tool_pymol_label(self, cmd, arguments):
             selection = arguments.get("selection", "")
             expression = arguments.get("expression", "%s%i")
             cmd._get_feedback()
@@ -2109,7 +2035,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_ray":
+    def _tool_pymol_ray(self, cmd, arguments):
             width = arguments.get("width", 0)
             height = arguments.get("height", 0)
 
@@ -2127,7 +2053,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_png":
+    def _tool_pymol_png(self, cmd, arguments):
             filename = arguments.get("filename", "")
             dpi = arguments.get("dpi", 300)
             ray = arguments.get("ray", 1)
@@ -2142,14 +2068,14 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_reset":
+    def _tool_pymol_reset(self, cmd, arguments):
             cmd._get_feedback()
             cmd.reset()
             feedback = cmd._get_feedback()
             feedback_text = "\n".join(feedback) if feedback else ""
             return {"success": True, "message": "视图已重置", "output": feedback_text}
 
-        elif tool_name == "pymol_center":
+    def _tool_pymol_center(self, cmd, arguments):
             selection = arguments.get("selection", "all")
             cmd._get_feedback()
             cmd.center(selection)
@@ -2161,7 +2087,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_remove":
+    def _tool_pymol_remove(self, cmd, arguments):
             name = arguments.get("name", "")
             cmd._get_feedback()
             cmd.remove(name)
@@ -2173,7 +2099,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_set":
+    def _tool_pymol_set(self, cmd, arguments):
             setting = arguments.get("setting", "")
             value = arguments.get("value", "")
             selection = arguments.get("selection", "")
@@ -2192,11 +2118,7 @@ class ToolExecutor:
                 "output": feedback_text,
             }
 
-        elif tool_name == "pymol_capture_view":
-            import base64
-            import tempfile
-            import os
-
+    def _tool_pymol_capture_view(self, cmd, arguments):
             width = arguments.get("width", 800)
             height = arguments.get("height", 600)
             ray = arguments.get("ray", 0)
@@ -2227,7 +2149,7 @@ class ToolExecutor:
 
                 try:
                     os.unlink(tmp_filename)
-                except:
+                except Exception:
                     pass
 
                 return {
@@ -2245,13 +2167,40 @@ class ToolExecutor:
                 feedback_text = "\n".join(feedback) if feedback else ""
                 return {"success": False, "message": error_msg, "output": feedback_text}
 
-        else:
-            error_msg = f"未知工具: {tool_name}"
-            print(f"[PyMOL AI Assistant] 错误: {error_msg}")
-            print(
-                f"[PyMOL AI Assistant] 可用工具: {[t['function']['name'] for t in get_tool_definitions()]}"
-            )
-            return {"success": False, "message": error_msg}
+
+_TOOL_METHOD_MAP = {
+    "pymol_fetch": "_tool_pymol_fetch",
+    "pymol_load": "_tool_pymol_load",
+    "pymol_write_script": "_tool_pymol_write_script",
+    "pymol_run_script": "_tool_pymol_run_script",
+    "pymol_do_command": "_tool_pymol_do_command",
+    "pymol_get_info": "_tool_pymol_get_info",
+    "pymol_get_selection_details": "_tool_pymol_get_selection_details",
+    "pymol_get_atom_info": "_tool_pymol_get_atom_info",
+    "pymol_get_residue_info": "_tool_pymol_get_residue_info",
+    "pymol_get_chain_info": "_tool_pymol_get_chain_info",
+    "pymol_get_object_info": "_tool_pymol_get_object_info",
+    "pymol_get_distance": "_tool_pymol_get_distance",
+    "pymol_get_angle": "_tool_pymol_get_angle",
+    "pymol_get_dihedral": "_tool_pymol_get_dihedral",
+    "pymol_find_contacts": "_tool_pymol_find_contacts",
+    "pymol_show": "_tool_pymol_show",
+    "pymol_hide": "_tool_pymol_hide",
+    "pymol_color": "_tool_pymol_color",
+    "pymol_bg_color": "_tool_pymol_bg_color",
+    "pymol_zoom": "_tool_pymol_zoom",
+    "pymol_rotate": "_tool_pymol_rotate",
+    "pymol_select": "_tool_pymol_select",
+    "pymol_label": "_tool_pymol_label",
+    "pymol_ray": "_tool_pymol_ray",
+    "pymol_png": "_tool_pymol_png",
+    "pymol_reset": "_tool_pymol_reset",
+    "pymol_center": "_tool_pymol_center",
+    "pymol_remove": "_tool_pymol_remove",
+    "pymol_set": "_tool_pymol_set",
+    "pymol_capture_view": "_tool_pymol_capture_view",
+}
+
 
 
 # 工具描述导出（兼容旧代码）

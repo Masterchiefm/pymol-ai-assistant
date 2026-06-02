@@ -14,10 +14,11 @@ Description:
 from __future__ import print_function
 import sys
 import os
+import threading
 
 
 # 版本号
-__version__ = "3.1.1"
+__version__ = "3.1.2"
 
 # 获取插件目录
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -48,11 +49,12 @@ def check_and_install_dependencies():
         "markdown": "markdown",
     }
 
-    missing_packages = [
-        install_name
-        for package_name, install_name in required_packages.items()
-        if package_name not in sys.modules
-    ]
+    missing_packages = []
+    for package_name, install_name in required_packages.items():
+        try:
+            __import__(package_name)
+        except ImportError:
+            missing_packages.append(install_name)
 
     if missing_packages:
         print(
@@ -76,7 +78,8 @@ def check_and_install_dependencies():
                     + missing_packages
                 )
                 print("[PyMOL AI Assistant] 依赖安装成功！")
-                open(DEPENDENCE_OK_FILE, "w").close()
+                with open(DEPENDENCE_OK_FILE, "w"):
+                    pass
                 return
             except Exception as e:
                 print(
@@ -88,10 +91,12 @@ def check_and_install_dependencies():
             )
         )
     else:
-        open(DEPENDENCE_OK_FILE, "w").close()
+        with open(DEPENDENCE_OK_FILE, "w"):
+            pass
 
 
 # 全局变量存储更新信息
+_update_info_lock = threading.Lock()
 _update_info = {
     "has_update": False,
     "latest_version": "",
@@ -125,9 +130,10 @@ def check_update():
 
             # 只要版本号不同就提示更新
             if latest_version != __version__:
-                _update_info["has_update"] = True
-                _update_info["latest_version"] = latest_version
-                _update_info["release_info"] = release_info
+                with _update_info_lock:
+                    _update_info["has_update"] = True
+                    _update_info["latest_version"] = latest_version
+                    _update_info["release_info"] = release_info
                 print(
                     "[PyMOL AI Assistant] 发现新版本: v{} (当前: v{})".format(
                         latest_version, __version__
@@ -155,7 +161,8 @@ def check_update():
 
 def get_update_info():
     """获取更新信息"""
-    return _update_info
+    with _update_info_lock:
+        return dict(_update_info)
 
 
 # 在后台检查依赖（不阻塞启动）
@@ -194,7 +201,7 @@ def show_dialog():
         from pymol import cmd
 
         parent = cmd.get_qtwindow()
-    except:
+    except Exception:
         pass
 
     # 如果对话框已存在，则显示它
@@ -204,7 +211,7 @@ def show_dialog():
             _dialog_instance.raise_()
             _dialog_instance.activateWindow()
             return
-        except:
+        except RuntimeError:
             _dialog_instance = None
 
     # 创建新对话框

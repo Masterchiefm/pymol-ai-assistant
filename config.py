@@ -5,6 +5,27 @@
 
 import os
 import json
+import base64 as _base64
+
+_OBFUSCATION_PREFIX = "enc:"
+
+
+def _obfuscate(value):
+    if not value:
+        return value
+    return _OBFUSCATION_PREFIX + _base64.b64encode(value.encode("utf-8")).decode("ascii")
+
+
+def _deobfuscate(value):
+    if not value or not isinstance(value, str):
+        return value
+    if not value.startswith(_OBFUSCATION_PREFIX):
+        return value
+    try:
+        return _base64.b64decode(value[len(_OBFUSCATION_PREFIX):].encode("ascii")).decode("utf-8")
+    except Exception:
+        return value
+
 from . import i18n as _i18n
 
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".pymol_ai_assistant_config.json")
@@ -13,14 +34,14 @@ DEFAULT_CONFIG = {"current_config": None, "language": "zh", "configs": []}
 
 PROVIDERS = {
     "siliconflow": {
-        "name": "SiliconFlow",
+        "name": "SiliconFlow (硅基流动)",
         "api_base": "https://api.siliconflow.cn/v1",
         "models": [
-            "Pro/moonshotai/Kimi-K2.5",
+            "Pro/moonshotai/Kimi-K2.6",
             "Pro/zai-org/GLM-5",
             "Pro/zai-org/GLM-5.1",
-            "deepseek-ai/DeepSeek-V3.2",
-            "deepseek-ai/DeepSeek-V3",
+            "deepseek-ai/DeepSeek-V4-Pro",
+            "deepseek-ai/DeepSeek-V4-Flash",
         ],
         "prefix": "openai/",
         "requires_api_key": True,
@@ -64,7 +85,7 @@ PROVIDERS = {
     "deepseek": {
         "name": "DeepSeek",
         "api_base": "https://api.deepseek.com",
-        "models": ["deepseek-v3.2", "deepseek-v3", "deepseek-r1", "deepseek-chat"],
+        "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
         "prefix": "deepseek/",
         "requires_api_key": True,
         "requires_api_base": False,
@@ -116,7 +137,7 @@ PROVIDERS = {
         "requires_api_version": False,
     },
     "zai": {
-        "name": "智谱 AI (ZAI \u56fd\u9645)",
+        "name": "ZAI (智谱-国际版)",
         "api_base": "",
         "models": [
             "glm-5",
@@ -132,7 +153,7 @@ PROVIDERS = {
         "requires_api_version": False,
     },
     "zhipu": {
-        "name": "智谱 AI (BigModel \u56fd\u5185)",
+        "name": "BigModel (智谱-国内版)",
         "api_base": "https://open.bigmodel.cn/api/paas/v4",
         "models": [
             "glm-5",
@@ -298,6 +319,9 @@ class ConfigManager:
             try:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
+                    for cfg in loaded.get("configs", []):
+                        if "api_key" in cfg:
+                            cfg["api_key"] = _deobfuscate(cfg["api_key"])
                     self._config.update(loaded)
                     self._migrate_old_configs()
             except Exception as e:
@@ -354,8 +378,12 @@ class ConfigManager:
     def save(self):
         """保存配置到文件"""
         try:
+            save_data = json.loads(json.dumps(self._config))
+            for cfg in save_data.get("configs", []):
+                if "api_key" in cfg and cfg["api_key"]:
+                    cfg["api_key"] = _obfuscate(cfg["api_key"])
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(self._config, f, ensure_ascii=False, indent=2)
+                json.dump(save_data, f, ensure_ascii=False, indent=2)
             return True
         except Exception as e:
             print("[PyMOL AI Assistant] 保存配置失败: {}".format(e))
@@ -430,12 +458,15 @@ class ConfigManager:
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 imported = json.load(f)
+                configs_list = []
                 if isinstance(imported, list):
-                    for config in imported:
-                        self.add_config(config)
+                    configs_list = imported
                 elif isinstance(imported, dict) and "configs" in imported:
-                    for config in imported["configs"]:
-                        self.add_config(config)
+                    configs_list = imported["configs"]
+                for cfg in configs_list:
+                    if "api_key" in cfg:
+                        cfg["api_key"] = _deobfuscate(cfg["api_key"])
+                    self.add_config(cfg)
                 return True
         except Exception as e:
             print("[PyMOL AI Assistant] 导入配置失败: {}".format(e))

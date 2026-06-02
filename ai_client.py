@@ -175,6 +175,9 @@ class AIClient:
 【美化与渲染风格】
 当用户需要美化或优化图片时，可以使用以下风格：
 
+【注意事项】除非用户明确要求，否则不要使用 cartoon_cylindrical_helices 将α螺旋渲染为圆柱形。
+除非用户明确要求导出或保存图片，否则不要使用 pymol_png 工具或 ray + png 命令。
+
 1. 单色扁平莫兰迪 - 冷淡简约风格
    ```
    set cartoon_loop_radius, 0.2
@@ -211,10 +214,28 @@ class AIClient:
    set fog, 0
    ```
 
+3. 精美渲染风格 - 适合需要高质量展示图的场景
+   ```
+   set light_count, 1
+   set specular, 0
+   set cartoon_oval_width, 0.1
+   set cartoon_oval_length, 0.6
+   set cartoon_loop_radius, 0.1
+   set cartoon_rect_width, 0.12
+   set cartoon_rect_length, 1
+   set ray_trace_mode, 1
+   set ray_trace_gain, 0.05
+   set ray_trace_depth_factor, 1
+   set ambient, 0.8
+   set cartoon_side_chain_helper, on
+   set valence, off
+   set ray_shadow, off
+   set reflect, 0.5
+   ```
+
 通用美化技巧：
 - 使用 `ray` 进行光线追踪渲染获得高质量图像
 - 使用 `png` 保存图像，设置合适的 dpi（如 300）
-- 使用 `set cartoon_cylindrical_helices, on` 让螺旋更立体
 - 使用 `bg_gradient, on, 颜色1, 颜色2` 创建渐变背景
 - 使用 `set transparency, 0.5` 添加透明度效果
 
@@ -385,7 +406,7 @@ class AIClient:
                                 continue
                         except json.JSONDecodeError:
                             pass
-                except:
+                except Exception:
                     pass
 
             processed.append(processed_msg)
@@ -628,26 +649,18 @@ class AIClient:
                     on_thinking=on_thinking,
                     on_content=on_content,
                 )
-            except _litellm.AuthenticationError as e:
-                error_msg = "API认证失败: %s" % str(e)
-                logger.logger.error(logger.ERRORS, error_msg)
-                if on_error:
-                    on_error(error_msg)
-                return ""
-            except _litellm.RateLimitError as e:
-                error_msg = "API速率限制: %s" % str(e)
-                logger.logger.error(logger.ERRORS, error_msg)
-                if on_error:
-                    on_error(error_msg)
-                return ""
-            except _litellm.APIError as e:
-                error_msg = "API错误: %s" % str(e)
-                logger.logger.error(logger.ERRORS, error_msg)
-                if on_error:
-                    on_error(error_msg)
-                return ""
             except Exception as e:
-                error_msg = "AI请求错误: %s" % str(e)
+                if _litellm is not None:
+                    if isinstance(e, _litellm.AuthenticationError):
+                        error_msg = "API认证失败: %s" % str(e)
+                    elif isinstance(e, _litellm.RateLimitError):
+                        error_msg = "API速率限制: %s" % str(e)
+                    elif isinstance(e, _litellm.APIError):
+                        error_msg = "API错误: %s" % str(e)
+                    else:
+                        error_msg = "AI请求错误: %s" % str(e)
+                else:
+                    error_msg = "AI请求错误: %s" % str(e)
                 logger.logger.error(logger.ERRORS, error_msg)
                 if on_error:
                     on_error(error_msg)
