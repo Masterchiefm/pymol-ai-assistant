@@ -1,6 +1,6 @@
 # PyMOL AI Assistant Plugin
 
-[![Version](https://img.shields.io/badge/version-1.4.1-blue.svg)](https://github.com/Masterchiefm/pymol-ai-assistant/releases)
+[![Version](https://img.shields.io/badge/version-3.1.3-blue.svg)](https://github.com/Masterchiefm/pymol-ai-assistant/releases)
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 

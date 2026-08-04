@@ -64,7 +64,7 @@ class AIClient:
         self.is_reasoning_model = False
         self.is_vision_model = False
         self.temperature = 0.7
-        self.max_tokens = 8000
+        self.max_tokens = config.DEFAULT_MAX_OUTPUT_TOKENS
         self.timeout = 60
         self.max_iterations = 40
 
@@ -78,7 +78,11 @@ class AIClient:
         self.is_reasoning_model = api_config.get("is_reasoning_model", False)
         self.is_vision_model = api_config.get("is_vision_model", False)
         self.temperature = api_config.get("temperature", 0.7)
-        self.max_tokens = api_config.get("max_tokens", 8000)
+        configured_max = api_config.get(
+            "max_tokens", config.DEFAULT_MAX_OUTPUT_TOKENS
+        )
+        model_limit = config.get_model_limits(self.model)["max_output_tokens"]
+        self.max_tokens = max(1, min(configured_max, model_limit))
         self.timeout = api_config.get("timeout", 60)
 
     def _get_model_name(self):
