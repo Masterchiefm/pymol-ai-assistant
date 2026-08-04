@@ -913,6 +913,8 @@ class ConfigWidget(QtWidgets.QWidget):
             self.delete_btn.setText(i18n._("delete_button"))
         if hasattr(self, "test_btn"):
             self.test_btn.setText(i18n._("test_connection"))
+        if hasattr(self, "model_combo"):
+            self.update_model_limits(self.model_combo.currentText())
         if hasattr(self, "import_btn"):
             self.import_btn.setText(i18n._("import_button"))
         if hasattr(self, "export_btn"):
@@ -1102,6 +1104,7 @@ class ConfigWidget(QtWidgets.QWidget):
         self.model_combo.setEditable(True)
         self.model_combo.setStyleSheet(combo_style)
         self.model_combo.currentIndexChanged.connect(self.on_model_changed)
+        self.model_combo.currentTextChanged.connect(self.update_model_limits)
         form_layout.addWidget(self.labels["model_label"], row, 0)
         form_layout.addWidget(self.model_combo, row, 1)
 
@@ -1225,12 +1228,17 @@ class ConfigWidget(QtWidgets.QWidget):
         self.labels["tokens_label"] = QtWidgets.QLabel(i18n._("max_tokens"))
         self.labels["tokens_label"].setStyleSheet("color: #AAAAAA; font-size: 12px;")
         self.max_tokens_spin = QtWidgets.QSpinBox()
-        self.max_tokens_spin.setRange(100, 8192)
-        self.max_tokens_spin.setSingleStep(100)
-        self.max_tokens_spin.setValue(8000)
+        self.max_tokens_spin.setRange(100, config.CUSTOM_MAX_OUTPUT_TOKENS)
+        self.max_tokens_spin.setSingleStep(1024)
+        self.max_tokens_spin.setValue(config.DEFAULT_MAX_OUTPUT_TOKENS)
         self.max_tokens_spin.setStyleSheet(spin_style)
         advanced_layout.addWidget(self.labels["tokens_label"], 1, 0)
         advanced_layout.addWidget(self.max_tokens_spin, 1, 1)
+
+        self.context_window_label = QtWidgets.QLabel(i18n._("context_window_unknown"))
+        self.context_window_label.setStyleSheet("color: #888888; font-size: 11px;")
+        self.context_window_label.setWordWrap(True)
+        advanced_layout.addWidget(self.context_window_label, 2, 0, 1, 2)
 
         self.labels["timeout_label"] = QtWidgets.QLabel(i18n._("timeout"))
         self.labels["timeout_label"].setStyleSheet("color: #AAAAAA; font-size: 12px;")
@@ -1239,8 +1247,8 @@ class ConfigWidget(QtWidgets.QWidget):
         self.timeout_spin.setSingleStep(10)
         self.timeout_spin.setValue(60)
         self.timeout_spin.setStyleSheet(spin_style)
-        advanced_layout.addWidget(self.labels["timeout_label"], 2, 0)
-        advanced_layout.addWidget(self.timeout_spin, 2, 1)
+        advanced_layout.addWidget(self.labels["timeout_label"], 3, 0)
+        advanced_layout.addWidget(self.timeout_spin, 3, 1)
 
         self.advanced_frame.hide()
         panel_layout.addWidget(self.advanced_frame)
@@ -1450,6 +1458,34 @@ class ConfigWidget(QtWidgets.QWidget):
             self.model_combo.setEditText("")
             self.model_combo.setFocus()
 
+    def update_model_limits(self, model_name):
+        """Update output range and show the selected model's context capacity."""
+        if not hasattr(self, "max_tokens_spin") or not hasattr(
+            self, "context_window_label"
+        ):
+            return
+
+        limits = config.get_model_limits(model_name.strip())
+        max_output = limits["max_output_tokens"]
+        self.max_tokens_spin.setMaximum(max_output)
+
+        context_window = limits["context_window"]
+        if context_window and limits["max_output_known"]:
+            self.context_window_label.setText(
+                i18n._("context_window_known").format(
+                    context_window="{:,}".format(context_window),
+                    max_output="{:,}".format(max_output),
+                )
+            )
+        elif context_window:
+            self.context_window_label.setText(
+                i18n._("context_window_only").format(
+                    context_window="{:,}".format(context_window)
+                )
+            )
+        else:
+            self.context_window_label.setText(i18n._("context_window_unknown"))
+
     def load_configs(self):
         self.config_list.clear()
         current = config.config_manager.get_current_config()
@@ -1494,7 +1530,10 @@ class ConfigWidget(QtWidgets.QWidget):
         self.reasoning_checkbox.setChecked(cfg.get("is_reasoning_model", False))
         self.vision_checkbox.setChecked(cfg.get("is_vision_model", False))
         self.temp_spin.setValue(cfg.get("temperature", 0.7))
-        self.max_tokens_spin.setValue(cfg.get("max_tokens", 8000))
+        self.update_model_limits(model)
+        self.max_tokens_spin.setValue(
+            cfg.get("max_tokens", config.DEFAULT_MAX_OUTPUT_TOKENS)
+        )
         self.timeout_spin.setValue(cfg.get("timeout", 60))
 
         current = config.config_manager.get_current_config()
@@ -1512,7 +1551,7 @@ class ConfigWidget(QtWidgets.QWidget):
         self.vision_checkbox.setChecked(False)
         self.current_checkbox.setChecked(False)
         self.temp_spin.setValue(0.7)
-        self.max_tokens_spin.setValue(8000)
+        self.max_tokens_spin.setValue(config.DEFAULT_MAX_OUTPUT_TOKENS)
         self.timeout_spin.setValue(60)
         self.provider_combo.setCurrentIndex(0)
         self.on_provider_changed(0)

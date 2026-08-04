@@ -32,16 +32,72 @@ CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".pymol_ai_assistant_config.
 
 DEFAULT_CONFIG = {"current_config": None, "language": "zh", "configs": []}
 
+# LiteLLM is a routing layer and does not impose one universal context limit.
+# Keep authoritative provider limits here so the UI is not constrained by an
+# out-of-date LiteLLM model-cost table.  Values are total context / max output.
+DEFAULT_MAX_OUTPUT_TOKENS = 32768
+CUSTOM_MAX_OUTPUT_TOKENS = 1000000
+
+MODEL_LIMITS = {
+    "gpt-5.6-sol": (1050000, 128000),
+    "gpt-5.6-terra": (1050000, 128000),
+    "gpt-5.6-luna": (1050000, 128000),
+    "claude-fable-5": (1000000, 128000),
+    "claude-opus-5": (1000000, 128000),
+    "claude-sonnet-5": (1000000, 128000),
+    "claude-haiku-4-5": (200000, 64000),
+    "claude-haiku-4-5-20251001": (200000, 64000),
+    "gemini-3.6-flash": (1000000, 64000),
+    "gemini-3.5-flash": (1000000, 64000),
+    "gemini-3.5-flash-lite": (1000000, 64000),
+    "gemini-3.1-pro-preview": (1000000, 64000),
+    "deepseek-v4-flash": (1000000, 384000),
+    "deepseek-v4-pro": (1000000, 384000),
+    "DeepSeek-V4-Flash": (1000000, 384000),
+    "DeepSeek-V4-Pro": (1000000, 384000),
+    "qwen3.7-max": (1000000, None),
+    "qwen3.7-plus": (1000000, 64000),
+    "qwen3.7-flash": (1000000, None),
+    "qwen3.6-plus": (1000000, 64000),
+    "qwen3.6-flash": (1000000, 64000),
+    "qwen3-coder-plus": (1000000, None),
+    "qwen3-coder-next": (262144, None),
+    "qwen3.6-27b": (262144, None),
+    "qwen3.5-397b-a17b": (262144, None),
+    "MiniMax-M3": (1000000, None),
+    "MiniMax-M2.7": (204800, None),
+    "MiniMax-M2.7-highspeed": (204800, None),
+    "glm-5.2": (1000000, 128000),
+    "glm-5.1": (200000, 128000),
+    "glm-5": (200000, 128000),
+    "glm-5-turbo": (200000, 128000),
+    "glm-5v-turbo": (200000, 128000),
+    "glm-4.7": (200000, 128000),
+    "grok-4.5": (500000, None),
+    "kimi-k3": (1000000, None),
+    "kimi-k2.7-code": (262144, None),
+    "kimi-k2.7-code-highspeed": (262144, None),
+    "kimi-k2.6": (262144, None),
+}
+
 PROVIDERS = {
     "siliconflow": {
         "name": "SiliconFlow (硅基流动)",
         "api_base": "https://api.siliconflow.cn/v1",
         "models": [
-            "Pro/moonshotai/Kimi-K2.6",
-            "Pro/zai-org/GLM-5",
+            "zai-org/GLM-5.2",
             "Pro/zai-org/GLM-5.1",
+            "moonshotai/Kimi-K2.7-Code",
+            "Pro/moonshotai/Kimi-K2.6",
             "deepseek-ai/DeepSeek-V4-Pro",
             "deepseek-ai/DeepSeek-V4-Flash",
+            "Qwen/Qwen3.6-35B-A3B",
+            "Qwen/Qwen3.6-27B",
+            "Qwen/Qwen3.5-397B-A17B",
+            "Qwen/Qwen3-VL-32B-Instruct",
+            "nex-agi/Nex-N2-Pro",
+            "meituan-longcat/LongCat-2.0",
+            "MiniMaxAI/MiniMax-M2.5",
         ],
         "prefix": "openai/",
         "requires_api_key": True,
@@ -52,7 +108,7 @@ PROVIDERS = {
     "openai": {
         "name": "OpenAI",
         "api_base": "https://api.openai.com/v1",
-        "models": ["gpt-4.1", "gpt-4o", "gpt-4o-mini", "o3", "o4-mini"],
+        "models": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
         "prefix": "openai/",
         "requires_api_key": True,
         "requires_api_base": False,
@@ -62,11 +118,10 @@ PROVIDERS = {
         "name": "Anthropic (Claude)",
         "api_base": "https://api.anthropic.com/v1",
         "models": [
-            "claude-opus-4-6",
-            "claude-sonnet-4-5",
+            "claude-fable-5",
+            "claude-opus-5",
+            "claude-sonnet-5",
             "claude-haiku-4-5",
-            "claude-sonnet-4-20250514",
-            "claude-3-7-sonnet-20250219",
         ],
         "prefix": "anthropic/",
         "requires_api_key": True,
@@ -76,7 +131,12 @@ PROVIDERS = {
     "gemini": {
         "name": "Google Gemini",
         "api_base": "https://generativelanguage.googleapis.com/v1beta",
-        "models": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
+        "models": [
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-pro-preview",
+        ],
         "prefix": "gemini/",
         "requires_api_key": True,
         "requires_api_base": False,
@@ -95,12 +155,13 @@ PROVIDERS = {
         "name": "通义千问 (DashScope)",
         "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
         "models": [
-            "qwen3-max",
+            "qwen3.7-max",
+            "qwen3.7-plus",
+            "qwen3.7-flash",
+            "qwen3.6-plus",
+            "qwen3.6-flash",
             "qwen3-coder-plus",
-            "qwen3-coder-flash",
-            "qwen3.5-plus",
-            "qwen-plus-latest",
-            "qwq-plus",
+            "qwen3-coder-next",
         ],
         "prefix": "dashscope/",
         "requires_api_key": True,
@@ -111,10 +172,9 @@ PROVIDERS = {
         "name": "MiniMax",
         "api_base": "https://api.minimax.chat/v1",
         "models": [
-            "MiniMax-M2.5",
-            "MiniMax-M2.5-lightning",
-            "MiniMax-M2.1",
-            "MiniMax-M2.1-lightning",
+            "MiniMax-M3",
+            "MiniMax-M2.7",
+            "MiniMax-M2.7-highspeed",
         ],
         "prefix": "minimax/",
         "requires_api_key": True,
@@ -125,11 +185,10 @@ PROVIDERS = {
         "name": "Kimi (Moonshot)",
         "api_base": "https://api.moonshot.cn/v1",
         "models": [
-            "kimi-k2.5",
-            "kimi-latest",
-            "kimi-k2-thinking",
-            "moonshot-v1-auto",
-            "moonshot-v1-128k",
+            "kimi-k3",
+            "kimi-k2.7-code",
+            "kimi-k2.7-code-highspeed",
+            "kimi-k2.6",
         ],
         "prefix": "moonshot/",
         "requires_api_key": True,
@@ -138,14 +197,14 @@ PROVIDERS = {
     },
     "zai": {
         "name": "ZAI (智谱-国际版)",
-        "api_base": "",
+        "api_base": "https://api.z.ai/api/paas/v4",
         "models": [
+            "glm-5.2",
+            "glm-5.1",
             "glm-5",
-            "glm-5-code",
+            "glm-5-turbo",
+            "glm-5v-turbo",
             "glm-4.7",
-            "glm-4.6",
-            "glm-4.5",
-            "glm-4.5-flash",
         ],
         "prefix": "zai/",
         "requires_api_key": True,
@@ -156,11 +215,12 @@ PROVIDERS = {
         "name": "BigModel (智谱-国内版)",
         "api_base": "https://open.bigmodel.cn/api/paas/v4",
         "models": [
+            "glm-5.2",
+            "glm-5.1",
             "glm-5",
-            "glm-5-code",
-            "glm-4-plus",
-            "glm-4-flash",
-            "glm-4v-plus",
+            "glm-5-turbo",
+            "glm-5v-turbo",
+            "glm-4.7",
         ],
         "prefix": "openai/",
         "requires_api_key": True,
@@ -171,11 +231,9 @@ PROVIDERS = {
         "name": "xAI (Grok)",
         "api_base": "https://api.x.ai/v1",
         "models": [
+            "grok-4.5",
             "grok-4",
-            "grok-4-latest",
             "grok-4-1-fast",
-            "grok-3-latest",
-            "grok-3-mini-fast-latest",
         ],
         "prefix": "xai/",
         "requires_api_key": True,
@@ -186,12 +244,11 @@ PROVIDERS = {
         "name": "OpenRouter",
         "api_base": "https://openrouter.ai/api/v1",
         "models": [
-            "openai/gpt-4.1",
-            "openai/o3",
-            "anthropic/claude-sonnet-4-5",
-            "google/gemini-2.5-pro",
-            "deepseek/deepseek-v3.2",
-            "x-ai/grok-4",
+            "openai/gpt-5.6-sol",
+            "anthropic/claude-sonnet-5",
+            "google/gemini-3.6-flash",
+            "deepseek/deepseek-v4-pro",
+            "x-ai/grok-4.5",
         ],
         "prefix": "openrouter/",
         "requires_api_key": True,
@@ -262,6 +319,41 @@ def get_litellm_model_name(provider_id, model_name):
     return f"{prefix}{model_name}"
 
 
+def get_model_limits(model_name):
+    """Return known provider limits without treating LiteLLM metadata as a cap."""
+    if not model_name:
+        return {
+            "context_window": None,
+            "max_output_tokens": CUSTOM_MAX_OUTPUT_TOKENS,
+            "max_output_known": False,
+        }
+
+    bare_name = model_name.rsplit("/", 1)[-1]
+    limits = MODEL_LIMITS.get(bare_name)
+    if limits is None:
+        bare_name_folded = bare_name.casefold()
+        limits = next(
+            (
+                value
+                for name, value in MODEL_LIMITS.items()
+                if name.casefold() == bare_name_folded
+            ),
+            None,
+        )
+    if limits:
+        return {
+            "context_window": limits[0],
+            "max_output_tokens": limits[1] or CUSTOM_MAX_OUTPUT_TOKENS,
+            "max_output_known": limits[1] is not None,
+        }
+
+    return {
+        "context_window": None,
+        "max_output_tokens": CUSTOM_MAX_OUTPUT_TOKENS,
+        "max_output_known": False,
+    }
+
+
 def create_default_config(name, provider_id="siliconflow"):
     """
     创建默认配置
@@ -286,7 +378,7 @@ def create_default_config(name, provider_id="siliconflow"):
         "is_reasoning_model": False,
         "is_vision_model": False,
         "temperature": 0.7,
-        "max_tokens": 8000,
+        "max_tokens": DEFAULT_MAX_OUTPUT_TOKENS,
         "timeout": 60,
     }
 
@@ -340,7 +432,10 @@ class ConfigManager:
             if "temperature" not in config:
                 config["temperature"] = 0.7
             if "max_tokens" not in config:
-                config["max_tokens"] = 8000
+                config["max_tokens"] = DEFAULT_MAX_OUTPUT_TOKENS
+            elif config["max_tokens"] == 8000:
+                # 8000 was the old hard-coded UI default/near-maximum.
+                config["max_tokens"] = DEFAULT_MAX_OUTPUT_TOKENS
             if "timeout" not in config:
                 config["timeout"] = 60
 
