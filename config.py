@@ -51,10 +51,11 @@ MODEL_LIMITS = {
     "gemini-3.5-flash": (1000000, 64000),
     "gemini-3.5-flash-lite": (1000000, 64000),
     "gemini-3.1-pro-preview": (1000000, 64000),
-    "deepseek-v4-flash": (1000000, 384000),
-    "deepseek-v4-pro": (1000000, 384000),
-    "DeepSeek-V4-Flash": (1000000, 384000),
-    "DeepSeek-V4-Pro": (1000000, 384000),
+    "deepseek-flash": (1048576, 393216),
+    "deepseek-v4-flash": (1048576, 393216),
+    "deepseek-v4-pro": (1048576, 393216),
+    "DeepSeek-V4-Flash": (1048576, 393216),
+    "DeepSeek-V4-Pro": (1048576, 393216),
     "qwen3.7-max": (1000000, None),
     "qwen3.7-plus": (1000000, 64000),
     "qwen3.7-flash": (1000000, None),
@@ -81,6 +82,17 @@ MODEL_LIMITS = {
 }
 
 PROVIDERS = {
+    "deepseek": {
+        "name": "DeepSeek",
+        "api_base": "https://api.deepseek.com",
+        "models": ["deepseek-flash", "deepseek-v4-pro"],
+        "prefix": "deepseek/",
+        "requires_api_key": True,
+        "requires_api_base": False,
+        "requires_api_version": False,
+        "register_link": "https://platform.deepseek.com/api_keys",
+        "usage_link": "https://platform.deepseek.com/usage",
+    },
     "siliconflow": {
         "name": "SiliconFlow (硅基流动)",
         "api_base": "https://api.siliconflow.cn/v1",
@@ -138,15 +150,6 @@ PROVIDERS = {
             "gemini-3.1-pro-preview",
         ],
         "prefix": "gemini/",
-        "requires_api_key": True,
-        "requires_api_base": False,
-        "requires_api_version": False,
-    },
-    "deepseek": {
-        "name": "DeepSeek",
-        "api_base": "https://api.deepseek.com",
-        "models": ["deepseek-v4-flash", "deepseek-v4-pro"],
-        "prefix": "deepseek/",
         "requires_api_key": True,
         "requires_api_base": False,
         "requires_api_version": False,
@@ -354,7 +357,7 @@ def get_model_limits(model_name):
     }
 
 
-def create_default_config(name, provider_id="siliconflow"):
+def create_default_config(name, provider_id="deepseek"):
     """
     创建默认配置
 

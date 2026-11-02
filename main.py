@@ -435,6 +435,9 @@ class ChatWidget(QtWidgets.QWidget):
         self.current_message_widget = None
         self.is_thinking = False
         self.is_streaming = False
+        # 累积当前请求的思考内容，attach 到 assistant 消息上，
+        # 用于 DeepSeek 思考模式的 reasoning_content 回传
+        self.pending_reasoning = ""
         self.loading_dots = 0
         self.loading_timer = QtCore.QTimer()
         self.loading_timer.timeout.connect(self._update_loading_animation)
@@ -826,6 +829,18 @@ class ChatWidget(QtWidgets.QWidget):
         self.current_message_widget = self.add_message(role, "")
         return self.current_message_widget
 
+    def attach_pending_reasoning(self):
+        """把本轮累积的思考内容挂到刚创建的 assistant 消息记录上。
+
+        DeepSeek 思考模式要求携带 tools 的请求把历史 reasoning_content
+        完整回传给 API（官方文档），否则返回 400。
+        """
+        if self.messages and self.messages[-1]["role"] == "assistant":
+            reasoning = self.pending_reasoning
+            if reasoning:
+                self.messages[-1]["reasoning_content"] = reasoning
+        self.pending_reasoning = ""
+
     def append_to_current(self, text):
         """追加到当前消息"""
         if self.current_message_widget:
@@ -864,9 +879,11 @@ class ChatWidget(QtWidgets.QWidget):
         for msg in self.messages:
             role = msg["role"]
             if role in ["user", "assistant"]:
-                api_messages.append(
-                    {"role": role, "content": msg["widget"].raw_content}
-                )
+                entry = {"role": role, "content": msg["widget"].raw_content}
+                # 回传 assistant 消息的思考内容（DeepSeek 思考模式必需）
+                if role == "assistant" and msg.get("reasoning_content"):
+                    entry["reasoning_content"] = msg["reasoning_content"]
+                api_messages.append(entry)
         return api_messages
 
 
@@ -930,16 +947,7 @@ class ConfigWidget(QtWidgets.QWidget):
             self.prompt_reset_btn.setText(i18n._("reset_prompts"))
 
         self.update_provider_combo()
-        if hasattr(self, "register_link_label"):
-            provider_id = self.provider_combo.currentData()
-            if provider_id:
-                provider_info = config.get_provider_info(provider_id)
-                register_link = provider_info.get("register_link", "")
-                if register_link:
-                    link_text = '<a href="{0}" style="color: #5DADE2; text-decoration: none;">{1}</a>'.format(
-                        register_link, i18n._("register_link")
-                    )
-                    self.register_link_label.setText(link_text)
+        self.update_provider_links()
         self.load_configs()
 
     def update_provider_combo(self):
@@ -954,6 +962,38 @@ class ConfigWidget(QtWidgets.QWidget):
         if idx >= 0:
             self.provider_combo.setCurrentIndex(idx)
         self.provider_combo.blockSignals(False)
+
+    def update_provider_links(self):
+        """根据当前提供商更新 API Key 输入框下方的链接（注册 / 用量查询）"""
+        if not hasattr(self, "register_link_label"):
+            return
+        provider_id = self.provider_combo.currentData()
+        provider_info = (
+            config.get_provider_info(provider_id) if provider_id else None
+        )
+
+        links = []
+        if provider_info:
+            register_link = provider_info.get("register_link", "")
+            if register_link:
+                links.append(
+                    '<a href="{0}" style="color: #5DADE2; text-decoration: none;">{1}</a>'.format(
+                        register_link, i18n._("register_link")
+                    )
+                )
+            usage_link = provider_info.get("usage_link", "")
+            if usage_link:
+                links.append(
+                    '<a href="{0}" style="color: #5DADE2; text-decoration: none;">{1}</a>'.format(
+                        usage_link, i18n._("usage_link")
+                    )
+                )
+
+        if links:
+            self.register_link_label.setText("&nbsp;&nbsp;".join(links))
+            self.register_link_label.setVisible(True)
+        else:
+            self.register_link_label.setVisible(False)
 
     def setup_ui(self):
         main_layout = QtWidgets.QVBoxLayout(self)
@@ -1428,15 +1468,7 @@ class ConfigWidget(QtWidgets.QWidget):
         if default_url:
             self.url_edit.setText(default_url)
 
-        register_link = provider_info.get("register_link", "")
-        if register_link and hasattr(self, "register_link_label"):
-            link_text = '<a href="{0}" style="color: #5DADE2; text-decoration: none;">{1}</a>'.format(
-                register_link, i18n._("register_link")
-            )
-            self.register_link_label.setText(link_text)
-            self.register_link_label.setVisible(True)
-        elif hasattr(self, "register_link_label"):
-            self.register_link_label.setVisible(False)
+        self.update_provider_links()
 
         requires_key = provider_info.get("requires_api_key", True)
         requires_base = provider_info.get("requires_api_base", False)
@@ -2625,6 +2657,9 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
         ai_client.ai_client.set_config(cfg)
 
+        # 新请求开始，清空上一轮可能残留的思考累积
+        self.chat_widget.pending_reasoning = ""
+
         # 记录用户输入（详细日志）
         logger.logger.info(
             logger.USER_INPUT,
@@ -2709,7 +2744,10 @@ class AIAssistantDialog(QtWidgets.QDialog):
         if text:
             if not self.chat_widget.is_thinking:
                 self.chat_widget.is_thinking = True
+                # 新一轮思考开始，重置累积（一轮 = 一次模型请求）
+                self.chat_widget.pending_reasoning = ""
                 self.chat_widget.start_message("thinking")
+            self.chat_widget.pending_reasoning += text
             self.chat_widget.append_to_current(text)
         if is_end:
             self.chat_widget.is_thinking = False
@@ -2726,11 +2764,13 @@ class AIAssistantDialog(QtWidgets.QDialog):
                 ):
                     self.chat_widget.current_message_widget.collapse_thinking_content()
                 self.chat_widget.start_message("assistant")
+                self.chat_widget.attach_pending_reasoning()
             elif (
                 not self.chat_widget.current_message_widget
                 or self.chat_widget.current_message_widget.role != "assistant"
             ):
                 self.chat_widget.start_message("assistant")
+                self.chat_widget.attach_pending_reasoning()
             self.chat_widget.append_to_current(text)
 
     def on_tool_call(self, tool_name, params, result):
@@ -2768,6 +2808,8 @@ class AIAssistantDialog(QtWidgets.QDialog):
             tool_name=tool_name,
             tool_result=result_text,
         )
+        # 本轮思考已随工具调用结束，避免残留累积到下一轮
+        self.chat_widget.pending_reasoning = ""
 
     def on_error(self, error_msg):
         # 记录错误到日志

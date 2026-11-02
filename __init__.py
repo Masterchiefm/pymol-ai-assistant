@@ -18,7 +18,7 @@ import threading
 
 
 # 版本号
-__version__ = "3.1.3"
+__version__ = "3.1.4"
 
 # 获取插件目录
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))

@@ -478,6 +478,16 @@ class AIClient:
         if self.provider == "azure" and self.api_version:
             request_params["api_version"] = self.api_version
 
+        if self.provider == "deepseek":
+            # DeepSeek V4 默认开启思考模式。用 extra_body 传 thinking 开关：
+            # litellm 会丢弃非 enabled 的普通 thinking 参数，extra_body 才能直达 API
+            # https://api-docs.deepseek.com/zh-cn/guides/thinking_mode
+            request_params["extra_body"] = {
+                "thinking": {
+                    "type": "enabled" if self.is_reasoning_model else "disabled"
+                }
+            }
+
         if use_tools:
             custom_prompts = config.config_manager.get_tool_prompts()
             request_params["tools"] = tools.get_tool_definitions(self.is_vision_model, custom_prompts)
@@ -700,6 +710,13 @@ class AIClient:
             }
             if reasoning_content:
                 assistant_msg["reasoning_content"] = reasoning_content
+            elif self.provider == "deepseek":
+                # DeepSeek 思考模式下，携带 tools 的请求必须完整回传
+                # reasoning_content——即使该轮模型没有输出思考内容，
+                # 也需要带上空字符串，否则 API 返回 400:
+                # "The reasoning_content in the thinking mode must be
+                #  passed back to the API"
+                assistant_msg["reasoning_content"] = ""
 
             full_messages.append(assistant_msg)
 
