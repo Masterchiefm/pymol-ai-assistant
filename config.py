@@ -551,6 +551,15 @@ class ConfigManager:
         self._config["tool_prompts"] = prompts
         return self.save()
 
+    def get_skills(self):
+        """获取本地技能列表"""
+        return self._config.get("skills", [])
+
+    def set_skills(self, skills):
+        """保存本地技能列表"""
+        self._config["skills"] = skills
+        return self.save()
+
     def import_configs(self, filepath):
         """从文件导入配置"""
         try:

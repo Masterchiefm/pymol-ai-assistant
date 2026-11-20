@@ -1912,6 +1912,181 @@ class LogWidget(QtWidgets.QWidget):
         logger.logger.remove_observer(self.on_log_entry)
 
 
+class SkillsWidget(QtWidgets.QWidget):
+    """本地技能管理界面"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        from . import skills as skills_mod
+
+        self._skills_mod = skills_mod
+        self.setup_ui()
+        self.refresh_list()
+
+    def setup_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
+
+        # 标题与说明
+        title = QtWidgets.QLabel("<b>%s</b>" % i18n._("skills_title"))
+        layout.addWidget(title)
+        hint = QtWidgets.QLabel(i18n._("skills_hint"))
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        # 按钮行
+        btn_layout = QtWidgets.QHBoxLayout()
+        self.import_file_btn = StyledButton(i18n._("skills_import_file"))
+        self.import_file_btn.clicked.connect(self.on_import_file)
+        btn_layout.addWidget(self.import_file_btn)
+
+        self.import_folder_btn = StyledButton(i18n._("skills_import_folder"))
+        self.import_folder_btn.clicked.connect(self.on_import_folder)
+        btn_layout.addWidget(self.import_folder_btn)
+
+        self.toggle_btn = StyledButton(i18n._("skills_enable"))
+        self.toggle_btn.clicked.connect(self.on_toggle)
+        btn_layout.addWidget(self.toggle_btn)
+
+        self.remove_btn = StyledButton(i18n._("skills_remove"))
+        self.remove_btn.clicked.connect(self.on_remove)
+        btn_layout.addWidget(self.remove_btn)
+
+        self.refresh_btn = StyledButton(i18n._("skills_refresh"))
+        self.refresh_btn.clicked.connect(self.refresh_list)
+        btn_layout.addWidget(self.refresh_btn)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        # 技能列表
+        self.table = QtWidgets.QTreeWidget()
+        self.table.setColumnCount(4)
+        self.table.setHeaderLabels([
+            i18n._("skills_column_name"),
+            i18n._("skills_column_type"),
+            i18n._("skills_column_status"),
+            i18n._("skills_column_path"),
+        ])
+        self.table.setRootIsDecorated(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.header().setSectionResizeMode(3, QtWidgets.QHeaderView.Stretch)
+        layout.addWidget(self.table)
+
+    def refresh_list(self):
+        """刷新技能列表"""
+        self.table.clear()
+        skill_list = self._skills_mod.skill_manager.get_skills()
+        if not skill_list:
+            empty_item = QtWidgets.QTreeWidgetItem([i18n._("skills_empty"), "", "", ""])
+            self.table.addTopLevelItem(empty_item)
+            return
+        for item in skill_list:
+            if not item.get("exists", True):
+                status = i18n._("skills_status_missing")
+            elif item.get("enabled", True):
+                status = i18n._("skills_status_enabled")
+            else:
+                status = i18n._("skills_status_disabled")
+            type_text = (
+                i18n._("skills_type_script")
+                if item.get("type") == "script"
+                else i18n._("skills_type_prompt")
+            )
+            tree_item = QtWidgets.QTreeWidgetItem([
+                item.get("name", ""),
+                type_text,
+                status,
+                item.get("path", ""),
+            ])
+            tree_item.setData(0, QtCore.Qt.UserRole, item.get("path", ""))
+            if not item.get("exists", True):
+                for col in range(4):
+                    tree_item.setForeground(
+                        col, QtGui.QBrush(QtGui.QColor("#E74C3C"))
+                    )
+            self.table.addTopLevelItem(tree_item)
+
+    def _get_selected_path(self):
+        selected = self.table.selectedItems()
+        if not selected:
+            return None
+        return selected[0].data(0, QtCore.Qt.UserRole)
+
+    def on_import_file(self):
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            i18n._("skills_import_file"),
+            "",
+            "Skills (*.md *.markdown *.txt *.py *.pym *.pml)",
+        )
+        if filename:
+            self._do_import(filename)
+
+    def on_import_folder(self):
+        folder = QtWidgets.QFileDialog.getExistingDirectory(
+            self, i18n._("skills_import_folder")
+        )
+        if folder:
+            self._do_import(folder)
+
+    def _do_import(self, path):
+        result = self._skills_mod.skill_manager.import_path(path)
+        if result.get("success"):
+            self.show_info(i18n._("skills_import_success"), result.get("message", ""))
+        else:
+            self.show_error(i18n._("skills_import_failed"), result.get("message", ""))
+        self.refresh_list()
+
+    def on_toggle(self):
+        path = self._get_selected_path()
+        if not path:
+            return
+        for item in self._skills_mod.skill_manager.get_skills():
+            if item.get("path") == path:
+                self._skills_mod.skill_manager.set_enabled(
+                    path, not item.get("enabled", True)
+                )
+                break
+        self.refresh_list()
+
+    def on_remove(self):
+        path = self._get_selected_path()
+        if not path:
+            return
+        name = os.path.splitext(os.path.basename(path))[0]
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            i18n._("confirm"),
+            i18n._("skills_delete_confirm", name),
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+        )
+        if reply == QtWidgets.QMessageBox.Yes:
+            self._skills_mod.skill_manager.remove_skill(path)
+            self.refresh_list()
+
+    def show_info(self, title, message):
+        QtWidgets.QMessageBox.information(self, title, message)
+
+    def show_error(self, title, message):
+        QtWidgets.QMessageBox.warning(self, title, message)
+
+    def update_language(self):
+        """更新界面语言"""
+        self.import_file_btn.setText(i18n._("skills_import_file"))
+        self.import_folder_btn.setText(i18n._("skills_import_folder"))
+        self.toggle_btn.setText(i18n._("skills_enable"))
+        self.remove_btn.setText(i18n._("skills_remove"))
+        self.refresh_btn.setText(i18n._("skills_refresh"))
+        self.table.setHeaderLabels([
+            i18n._("skills_column_name"),
+            i18n._("skills_column_type"),
+            i18n._("skills_column_status"),
+            i18n._("skills_column_path"),
+        ])
+        self.refresh_list()
+
+
 class AboutDialog(QtWidgets.QDialog):
     """关于对话框"""
 
@@ -2219,6 +2394,10 @@ class AIAssistantDialog(QtWidgets.QDialog):
         # 日志标签页
         self.log_widget = LogWidget()
         self.tabs.addTab(self.log_widget, i18n._("tab_log"))
+
+        # 技能标签页
+        self.skills_widget = SkillsWidget()
+        self.tabs.addTab(self.skills_widget, i18n._("tab_skills"))
 
         layout.addWidget(self.tabs)
 
@@ -2622,6 +2801,18 @@ class AIAssistantDialog(QtWidgets.QDialog):
         # 更新配置和日志界面
         self.config_widget.update_language()
         self.log_widget.update_language()
+        if hasattr(self, "skills_widget"):
+            self.skills_widget.update_language()
+
+        # 更新 Tab 标题文本
+        for index, key in [
+            (0, "tab_chat"),
+            (1, "tab_config"),
+            (2, "tab_log"),
+            (3, "tab_skills"),
+        ]:
+            if index < self.tabs.count():
+                self.tabs.setTabText(index, i18n._(key))
 
     def show_about_dialog(self):
         """显示关于对话框"""

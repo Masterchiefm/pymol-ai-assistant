@@ -261,6 +261,17 @@ class AIClient:
             base_prompt += """
 7. 如果需要查看当前渲染效果，可以使用 pymol_capture_view 工具捕获截图，这样可以直观地看到画面的实际效果"""
 
+        # 注入用户导入的本地技能（提示词类直接注入，脚本类登记路径）
+        try:
+            from . import skills as _skills_mod
+
+            _skills_mod.skill_manager.load_from_config()
+            _skills_block = _skills_mod.skill_manager.get_skills_prompt_block()
+            if _skills_block:
+                base_prompt += _skills_block
+        except Exception as _e:
+            print("[PyMOL AI Assistant] 加载本地技能失败: {}".format(_e))
+
         return base_prompt
 
     def _sanitize_messages(self, messages: list[dict]) -> list[dict]:
