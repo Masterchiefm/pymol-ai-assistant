@@ -537,6 +537,20 @@ class ChatWidget(QtWidgets.QWidget):
         self.image_preview_container.hide()
         input_layout.addWidget(self.image_preview_container)
 
+        # 当前调用技能栏（双击技能 Tab 中的条目后，以调用框形式显示在此处）
+        self.active_skills_container = QtWidgets.QWidget()
+        self.active_skills_layout = QtWidgets.QHBoxLayout(self.active_skills_container)
+        self.active_skills_layout.setContentsMargins(0, 0, 0, 0)
+        self.active_skills_layout.setSpacing(5)
+        self.active_skills_label = QtWidgets.QLabel(
+            "<b style='color:#5DADE2'>%s</b>" % i18n._("active_skills_label")
+        )
+        self.active_skills_layout.addWidget(self.active_skills_label)
+        self.active_skills_layout.addStretch()
+        self.active_skills_container.hide()
+        input_layout.addWidget(self.active_skills_container)
+        self._active_skill_map = {}  # {path: chip_button}
+
         # 输入框和图片导入按钮的水平布局
         input_row_layout = QtWidgets.QHBoxLayout()
 
@@ -649,6 +663,68 @@ class ChatWidget(QtWidgets.QWidget):
             pixmap = QtGui.QPixmap(filename)
             if not pixmap.isNull():
                 self.add_image_to_current(pixmap)
+
+    # ---------- 当前调用技能 ----------
+
+    def add_active_skill(self, path, name):
+        """添加当前调用的技能（显示为可点击移除的调用框）"""
+        if path in self._active_skill_map:
+            return
+        from . import skills as skills_mod
+
+        chip = QtWidgets.QPushButton(name + " ×")
+        chip.setStyleSheet("""
+            QPushButton {
+                background-color: #5DADE2;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 10px;
+                padding: 3px 10px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #E74C3C;
+            }
+        """)
+        chip.setToolTip(i18n._("active_skill_remove_hint"))
+        chip.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        chip.clicked.connect(lambda checked=False, p=path: self.remove_active_skill(p))
+
+        # 插入到 stretch 之前
+        self._active_skill_map[path] = chip
+        self.active_skills_layout.insertWidget(
+            self.active_skills_layout.count() - 1, chip
+        )
+        self.active_skills_container.show()
+        skills_mod.skill_manager.set_active(path, True)
+
+    def remove_active_skill(self, path):
+        """移除当前调用的技能"""
+        from . import skills as skills_mod
+
+        chip = self._active_skill_map.pop(path, None)
+        if chip is not None:
+            chip.setParent(None)
+            chip.deleteLater()
+        if not self._active_skill_map:
+            self.active_skills_container.hide()
+        skills_mod.skill_manager.set_active(path, False)
+        # 同步刷新技能 Tab 的状态显示（若可达）
+        try:
+            top = self.window()
+            if hasattr(top, "skills_widget"):
+                top.skills_widget.refresh_list()
+        except Exception:
+            pass
+
+    def restore_active_skills(self):
+        """从运行时状态恢复当前调用框（对话框重建时使用）"""
+        from . import skills as skills_mod
+
+        skills_mod.skill_manager.load_from_config()
+        for path in skills_mod.skill_manager.get_active_skills():
+            info = skills_mod.skill_manager._skills.get(path, {})
+            self.add_active_skill(path, info.get("name", os.path.basename(path)))
 
     def handle_pasted_image(self, image_data):
         """处理粘贴的图片"""
@@ -1915,6 +1991,8 @@ class LogWidget(QtWidgets.QWidget):
 class SkillsWidget(QtWidgets.QWidget):
     """本地技能管理界面"""
 
+    skill_activated = QtCore.Signal(str, str)  # (path, name) 双击调用技能
+
     def __init__(self, parent=None):
         super().__init__(parent)
         from . import skills as skills_mod
@@ -1971,7 +2049,16 @@ class SkillsWidget(QtWidgets.QWidget):
         self.table.setRootIsDecorated(False)
         self.table.setAlternatingRowColors(True)
         self.table.header().setSectionResizeMode(3, QtWidgets.QHeaderView.Stretch)
+        self.table.itemDoubleClicked.connect(self.on_item_double_clicked)
         layout.addWidget(self.table)
+
+    def on_item_double_clicked(self, item, column=0):
+        """双击技能条目：发出调用信号，由主窗口挂载到对话输入框上方"""
+        path = item.data(0, QtCore.Qt.UserRole)
+        if not path:
+            return
+        info = self._skills_mod.skill_manager._skills.get(path, {})
+        self.skill_activated.emit(path, info.get("name", os.path.basename(path)))
 
     def refresh_list(self):
         """刷新技能列表"""
@@ -1982,8 +2069,11 @@ class SkillsWidget(QtWidgets.QWidget):
             self.table.addTopLevelItem(empty_item)
             return
         for item in skill_list:
+            path = item.get("path", "")
             if not item.get("exists", True):
                 status = i18n._("skills_status_missing")
+            elif self._skills_mod.skill_manager.is_active(path):
+                status = i18n._("skills_status_active")
             elif item.get("enabled", True):
                 status = i18n._("skills_status_enabled")
             else:
@@ -2397,9 +2487,21 @@ class AIAssistantDialog(QtWidgets.QDialog):
 
         # 技能标签页
         self.skills_widget = SkillsWidget()
+        self.skills_widget.skill_activated.connect(self.on_skill_activated)
         self.tabs.addTab(self.skills_widget, i18n._("tab_skills"))
 
+        # 恢复上一会话中仍处于调用状态的技能
+        self.chat_widget.restore_active_skills()
+
         layout.addWidget(self.tabs)
+
+    def on_skill_activated(self, path, name):
+        """技能 Tab 双击调用：挂载调用框并跳转回对话页"""
+        if not self.chat_widget._active_skill_map.get(path):
+            self.chat_widget.add_active_skill(path, name)
+        if hasattr(self, "skills_widget"):
+            self.skills_widget.refresh_list()
+        self.tabs.setCurrentIndex(0)
 
     def setup_menu_bar(self):
         """设置菜单栏"""

@@ -148,7 +148,7 @@ TRANSLATIONS = {
         "warning": "警告",
         "tab_skills": "技能",
         "skills_title": "本地技能管理",
-        "skills_hint": "导入本地文件或文件夹作为技能。.md/.txt 文件内容将注入 AI 系统提示词；.py/.pml 脚本将登记路径，AI 可按需执行。",
+        "skills_hint": "导入本地文件或文件夹作为技能。双击列表中的技能即可在对话中调用：.md/.txt 内容将注入本次对话的提示词；.py/.pml 脚本将登记路径，AI 可按需执行。",
         "skills_import_file": "导入文件",
         "skills_import_folder": "导入文件夹",
         "skills_remove": "删除选中",
@@ -167,6 +167,9 @@ TRANSLATIONS = {
         "skills_status_enabled": "已启用",
         "skills_status_disabled": "已禁用",
         "skills_status_missing": "文件缺失",
+        "skills_status_active": "调用中",
+        "active_skills_label": "当前调用",
+        "active_skill_remove_hint": "点击移除该技能的调用",
     },
     "en": {
         "window_title": "PyMOL AI Assistant",
@@ -306,7 +309,7 @@ TRANSLATIONS = {
         "warning": "Warning",
         "tab_skills": "Skills",
         "skills_title": "Local Skills",
-        "skills_hint": "Import local files or folders as skills. .md/.txt files are injected into the AI system prompt; .py/.pml scripts are registered for on-demand execution via pymol_run_script.",
+        "skills_hint": "Import local files or folders as skills. Double-click a skill in the list to invoke it in the chat: .md/.txt content is injected into the prompt of the current conversation; .py/.pml scripts are registered for on-demand execution via pymol_run_script.",
         "skills_import_file": "Import File",
         "skills_import_folder": "Import Folder",
         "skills_remove": "Remove Selected",
@@ -325,6 +328,9 @@ TRANSLATIONS = {
         "skills_status_enabled": "Enabled",
         "skills_status_disabled": "Disabled",
         "skills_status_missing": "Missing",
+        "skills_status_active": "Active",
+        "active_skills_label": "Active Skills",
+        "active_skill_remove_hint": "Click to deactivate this skill",
     },
 }
 

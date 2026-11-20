@@ -261,7 +261,7 @@ class AIClient:
             base_prompt += """
 7. 如果需要查看当前渲染效果，可以使用 pymol_capture_view 工具捕获截图，这样可以直观地看到画面的实际效果"""
 
-        # 注入用户导入的本地技能（提示词类直接注入，脚本类登记路径）
+        # 注入当前调用的本地技能（仅双击激活的技能；提示词类直接注入，脚本类登记路径）
         try:
             from . import skills as _skills_mod
 
