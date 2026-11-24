@@ -18,7 +18,7 @@ import threading
 
 
 # 版本号
-__version__ = "3.1.4"
+__version__ = "3.1.5"
 
 # 获取插件目录
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -105,6 +105,23 @@ _update_info = {
 }
 
 
+def _parse_version(version_str):
+    """将版本号字符串解析为可比较的整数元组（忽略非数字后缀）"""
+    try:
+        parts = []
+        for seg in str(version_str).lstrip("v").split("."):
+            num = ""
+            for ch in seg:
+                if ch.isdigit():
+                    num += ch
+                else:
+                    break
+            parts.append(int(num) if num else 0)
+        return tuple(parts)
+    except Exception:
+        return (0,)
+
+
 def check_update():
     """检查更新"""
     import threading
@@ -128,8 +145,8 @@ def check_update():
             if not latest_version:
                 return
 
-            # 只要版本号不同就提示更新
-            if latest_version != __version__:
+            # 仅当线上版本号大于本地版本时才提示更新（避免本地新版被旧版反向提示）
+            if _parse_version(latest_version) > _parse_version(__version__):
                 with _update_info_lock:
                     _update_info["has_update"] = True
                     _update_info["latest_version"] = latest_version
